@@ -1,4 +1,4 @@
-// ignore_for_file: depend_on_referenced_packages
+// ignore_for_file: depend_on_referenced_packages, unnecessary_getters_setters
 
 import 'dart:convert';
 
@@ -14,16 +14,19 @@ JsonTreeController get jsonTreeController {
 }
 
 class JsonTreeController extends LiteStateController<JsonTreeController> {
-  TextEditingController jsonController = TextEditingController();
+  final TextEditingController jsonController = TextEditingController();
 
   String? _error;
   String? get error => _error;
   Map<String, dynamic> json = {};
   TypeWrapper? typeWrapper;
+  bool _langRegistered = false;
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
     highlight.registerLanguage('dart', dart_lang.dart);
+    _langRegistered = true;
+    rebuild();
   }
 
   String _modelName = 'ClassName';
@@ -32,15 +35,36 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     _modelName = value;
   }
 
+  bool get showHighlightedText {
+    return json.isNotEmpty && _error == null && _langRegistered;
+  }
+
+  String get formattedJson {
+    return const JsonEncoder.withIndent(' ').convert(json);
+  }
+
+  void rebuildJson() {
+    if (json.isNotEmpty) {
+      typeWrapper = buildTypeValueTree(
+        json: json,
+        typeName: _modelName,
+        name: _modelName.firstToLowerCase(),
+      );
+      rebuild();
+    }
+  }
+
   Future onJsonEnter(String value) async {
     try {
       _error = null;
       json = jsonDecode(value);
       typeWrapper = buildTypeValueTree(
         json: json,
-        name: _modelName,
+        typeName: _modelName,
+        name: _modelName.firstToLowerCase(),
       );
     } catch (e) {
+      json = {};
       _error = 'Invalid JSON';
     }
     rebuild();
@@ -97,30 +121,42 @@ class TypeWrapper extends Wrapper {
   }) : super(
           keyName: name,
         );
+
+  @override
+  set isNullable(bool value) {
+    super.isNullable = value;
+    for (var v in values) {
+      if (v.isChangedManually) {
+        continue;
+      }
+      v.isNullable = value;
+    }
+  }
+
+  String get proposedTypeName {
+    const suffix = '?';
+    if (alternativeTypeName != null) {
+      return '$alternativeTypeName$suffix';
+    }
+    return '${typeName ?? super.keyName.firstToUpperCase()}$suffix';
+  }
 }
 
 class ValueWrapper extends Wrapper {
   static final RegExp _doubleRegexp = RegExp(r'^(-?)(0|([1-9][0-9]*))(\.[0-9]+)?$');
 
-  String? alternativeName;
-
-  /// If proposed type name is incorrect, you can set an alternative
-  /// type name manually
-  String? alternativeTypeName;
   Object? value;
-  Object? alternativeDefaultValue;
-  bool isNullable = true;
+  Object? alternativeDefaultValue;  
 
   ValueWrapper({
     required String keyName,
-    this.alternativeName,
     this.value,
   }) : super(keyName: keyName);
 
   /// Balances or prices most probably must be doubles event they come as
   /// `int` in a json
   bool get _doubleMightBeUseful {
-    final lowerName = (alternativeName ?? keyName).toLowerCase();
+    final lowerName = (alternativeKeyName ?? keyName).toLowerCase();
     return (lowerName.contains('balance') ||
         lowerName.contains('price') ||
         lowerName.contains('fee') ||
@@ -130,14 +166,35 @@ class ValueWrapper extends Wrapper {
         lowerName.contains('amount'));
   }
 
+  bool get _dateTimeMightBeUseful {
+    final lowerName = (alternativeKeyName ?? keyName).toLowerCase();
+    return lowerName.contains('createdAt') ||
+        lowerName.contains('updatedAt') ||
+        lowerName.contains('date') ||
+        lowerName.contains('time');
+  }
+
+  @override
+  set isNullable(bool value) {
+    if (!canBeNullable) {
+      value = true;
+    }
+    super.isNullable = value;
+  }
+  
+  bool get canBeNullable {
+    return defaultValue != null;
+  }
+
   Object? get defaultValue {
     if (alternativeDefaultValue != null) {
       return alternativeDefaultValue!;
     }
-    final typeName = proposedTypeName;
-    if (typeName.endsWith('?')) {
-      return null;
-    }
+    final typeName = proposedTypeName.replaceAll('?', '');
+
+    // if (typeName.endsWith('?')) {
+    //   return null;
+    // }
     switch (typeName) {
       case 'int':
         return 0;
@@ -152,25 +209,25 @@ class ValueWrapper extends Wrapper {
   }
 
   String get proposedTypeName {
-    if (alternativeName != null) {
+    if (alternativeTypeName != null) {
       return alternativeTypeName!;
     }
     if (value == null) {
       return 'Object?';
     }
-    final suffix = isNullable ? '?' : '';
+    final suffix = _isNullable ? '?' : '';
     if (value is String) {
       String v = value as String;
       if (v.contains('.')) {
         if (_doubleRegexp.hasMatch(v)) {
           return 'double$suffix';
         }
-        return 'String$suffix';
+        // return 'String$suffix';
       }
       if (int.tryParse(v) != null) {
         return 'int$suffix';
       }
-      if (DateTime.tryParse(v) != null) {
+      if (DateTime.tryParse(v) != null || _dateTimeMightBeUseful) {
         return 'DateTime$suffix';
       }
       if (v.toLowerCase() == 'true' || v.toLowerCase() == 'false') {
@@ -192,6 +249,23 @@ class ValueWrapper extends Wrapper {
 
 class Wrapper {
   String keyName;
+  bool _isNullable = true;
+  set isNullable(bool value) {
+    _isNullable = value;
+  }
+
+  bool get isNullable {
+    return _isNullable;
+  }
+
+  String? alternativeKeyName;
+
+  bool isChangedManually = false;
+
+  /// If proposed type name is incorrect, you can set an alternative
+  /// type name manually
+  String? alternativeTypeName;
+
   Wrapper({
     required this.keyName,
   });

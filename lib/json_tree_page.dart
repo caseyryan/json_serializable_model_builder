@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:json_serializable_model_builder/controllers/json_tree_controller.dart';
+import 'package:json_serializable_model_builder/widgets/object_tree/object_tree.dart';
 import 'package:json_serializable_model_builder/widgets/raw_json_container.dart';
 import 'package:lite_forms/lite_forms.dart';
 
@@ -20,15 +22,25 @@ class _JsonTreePageState extends State<JsonTreePage> {
             'Build Json Serializable Model',
           ),
         ),
-        body: const SafeArea(
+        body: SafeArea(
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Expanded(
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Regenerate Model',
+                    onPressed: jsonTreeController.rebuildJson,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              const Expanded(
                 child: Row(
                   children: [
                     Expanded(
                       flex: 65,
-                      child: SizedBox(),
+                      child: ObjectTree(),
                     ),
                     VerticalDivider(
                       width: .5,

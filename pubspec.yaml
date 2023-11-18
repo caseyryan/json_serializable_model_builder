@@ -30,8 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  lite_forms: ^0.0.12
-  highlight: ^0.7.0
+  lite_forms: ^0.0.13
+  flutter_highlight: ^0.7.0
 
 
   # The following adds the Cupertino Icons font to your application.

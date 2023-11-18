@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:json_serializable_model_builder/controllers/json_tree_controller.dart';
+import 'package:json_serializable_model_builder/widgets/json_highlighter.dart';
 import 'package:lite_forms/lite_forms.dart';
 
 import '../json_formatter.dart';
@@ -18,17 +19,21 @@ class RawJsonContainer extends StatelessWidget {
                 color: Theme.of(context).cardColor,
                 width: double.infinity,
                 height: double.infinity,
-                child: TextFormField(
-                  maxLines: 1000000,
-                  controller: controller.jsonController,
-                  onChanged: controller.onJsonEnter,
-                  decoration: const InputDecoration.collapsed(
-                    hintText: 'Enter JSON',
-                  ),
-                  inputFormatters: [
-                    JsonFormatter(),
-                  ],
-                ),
+                child: controller.showHighlightedText
+                    ? JsonHighlighter(
+                        value: controller.formattedJson,
+                      )
+                    : TextFormField(
+                        maxLines: 1000000,
+                        controller: controller.jsonController,
+                        onChanged: controller.onJsonEnter,
+                        decoration: const InputDecoration.collapsed(
+                          hintText: 'Paste your JSON here',
+                        ),
+                        inputFormatters: [
+                          JsonFormatter(),
+                        ],
+                      ),
               ),
             ),
           ],
