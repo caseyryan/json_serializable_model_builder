@@ -107,7 +107,6 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     for (var wrapper in _filteredTypeWrappers) {
       wrapper.convertTypeWrappersToValueWrappers();
     }
-    print(_filteredTypeWrappers);
   }
 
   bool _isSimilarTypeWrappers(

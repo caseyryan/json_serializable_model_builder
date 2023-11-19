@@ -18,8 +18,19 @@ class ObjectTree extends StatelessWidget {
     }
     if (jsonTreeController.tryMergeSimilarTypes) {
       return SingleChildScrollView(
-        child: TypeView(
-          data: jsonTreeController.mergedTypeWrapper,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text(
+                'This tree does not correspond to the JSON structure. It only displays the inner classes. If you want it to correspond to the real structure, deselect `Merge similar classes`. But in this case you might end up with many different classes that have exactly the same structure but different names',
+              ),
+            ),
+            TypeView(
+              data: jsonTreeController.mergedTypeWrapper,
+            ),
+          ],
         ),
       );
     }

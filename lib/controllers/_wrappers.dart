@@ -18,12 +18,7 @@ class TypeWrapper extends Wrapper {
     for (var i = 0; i < values.length; i++) {
       final wrapper = values[i];
       if (wrapper is TypeWrapper) {
-        wrapper.convertTypeWrappersToValueWrappers();
-        final valueWrapper = ValueWrapper(
-          keyName: wrapper.keyName,
-        );
-        valueWrapper.alternativeTypeName = wrapper.proposedTypeName;
-        tempValues[i] = valueWrapper;
+        tempValues[i] = ValueWrapper.fromTypeWrapper(wrapper);
       } else {
         tempValues[i] = wrapper;
       }
@@ -75,6 +70,20 @@ class ValueWrapper extends Wrapper {
 
   Object? value;
   Object? alternativeDefaultValue;
+
+  /// If the value is converted from type, you won't be able
+  /// to change its name directly, only by renaming the type
+  TypeWrapper? _linkedType;
+
+  factory ValueWrapper.fromTypeWrapper(
+    TypeWrapper value,
+  ) {
+    final valueWrapper = ValueWrapper(keyName: value.keyName);
+    valueWrapper._linkedType = value;
+    valueWrapper.alternativeTypeName = value.proposedTypeName;
+    value.convertTypeWrappersToValueWrappers();
+    return valueWrapper;
+  }
 
   ValueWrapper({
     required String keyName,
