@@ -39,6 +39,8 @@ class _JsonTreePageState extends State<JsonTreePage> {
 
   @override
   Widget build(BuildContext context) {
+    const flex1 = 65;
+    const flex2 = 45;
     return LiteState<JsonTreeController>(
       builder: (BuildContext c, JsonTreeController controller) {
         return Unfocuser(
@@ -53,42 +55,59 @@ class _JsonTreePageState extends State<JsonTreePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      IconButton.outlined(
-                        tooltip: 'Regenerate Model',
-                        onPressed: () async {
-                          if (await showCupertinoConfirmation(
-                            context: context,
-                            description:
-                                'Do you want to reset all your changes and rebuild the model from scratch?',
-                          )) {
-                            jsonTreeController.rebuildJson();
-                          }
-                        },
-                        icon: const Icon(Icons.refresh),
-                      ),
-                      const Spacer(),
-                      if (!jsonTreeController.hasData)
-                        MaterialButton(
-                          onPressed: jsonTreeController.enterExample,
-                          child: const Text('Example JSON'),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: flex1,
+                          child: Row(
+                            children: [
+                              IconButton.outlined(
+                                tooltip: 'Regenerate Model',
+                                onPressed: () async {
+                                  if (await showCupertinoConfirmation(
+                                    context: context,
+                                    description:
+                                        'Do you want to reset all your changes and rebuild the model from scratch?',
+                                  )) {
+                                    jsonTreeController.rebuildJson();
+                                  }
+                                },
+                                icon: const Icon(Icons.refresh),
+                              ),
+                            ],
+                          ),
                         ),
-                      _buildClearButton(),
-                    ],
+                        Expanded(
+                          flex: flex2,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (!jsonTreeController.hasData)
+                                MaterialButton(
+                                  onPressed: jsonTreeController.enterExample,
+                                  child: const Text('Example JSON'),
+                                ),
+                              _buildClearButton(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   Expanded(
                     child: Row(
                       children: [
-                          Expanded(
-                          flex: 65,
+                        Expanded(
+                          flex: flex1,
                           child: ObjectTree(),
                         ),
                         const VerticalDivider(
                           width: .5,
                         ),
                         Expanded(
-                          flex: 45,
+                          flex: flex2,
                           child: RawJsonContainer(),
                         )
                       ],
