@@ -90,9 +90,8 @@ class _TypeViewState extends State<TypeView> {
                           value: widget.data.isNullable,
                           visualDensity: VisualDensity.adaptivePlatformDensity,
                           onChanged: (value) {
-                            setState(() {
-                              widget.data.isNullable = !widget.data.isNullable;
-                            });
+                            widget.data.isNullable = !widget.data.isNullable;
+                            jsonTreeController.rebuild();
                           },
                         ),
                       ),

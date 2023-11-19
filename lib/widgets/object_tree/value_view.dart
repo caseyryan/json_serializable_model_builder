@@ -66,7 +66,6 @@ class _ValueViewState extends State<ValueView> {
           child: Transform.scale(
             scale: .8,
             child: Checkbox(
-              focusColor: Colors.green,
               value: widget.data.isNullable,
               visualDensity: VisualDensity.adaptivePlatformDensity,
               onChanged: (value) {
@@ -103,7 +102,7 @@ class _ValueViewState extends State<ValueView> {
                       child: Text(
                         widget.data.proposedTypeName,
                         style: style.copyWith(
-                          color: const Color.fromARGB(255, 150, 11, 192),
+                          color: widget.data.typeColor,
                         ),
                       ),
                     ),

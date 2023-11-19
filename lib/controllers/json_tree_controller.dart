@@ -9,6 +9,9 @@ import 'package:highlight/languages/json.dart' as json_lang;
 import 'package:lite_forms/utils/exports.dart';
 import 'package:lite_state/lite_state.dart';
 
+part '_example_json.dart';
+part '_wrappers.dart';
+
 JsonTreeController get jsonTreeController {
   return findController<JsonTreeController>();
 }
@@ -21,6 +24,20 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   Map<String, dynamic> json = {};
   TypeWrapper? typeWrapper;
   bool _langRegistered = false;
+
+  final List<TypeWrapper> _allTypeWrappers = [];
+  final List<TypeWrapper> _filteredTypeWrappers = [];
+  List<TypeWrapper> get filteredTypeWrappers => _filteredTypeWrappers;
+
+  bool tryMergeSimilarTypes = true;
+
+  TypeWrapper get mergedTypeWrapper {
+    return TypeWrapper(
+      values: _filteredTypeWrappers,
+      typeName: _modelName,
+      name: _modelName.firstToLowerCase(),
+    );
+  }
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
@@ -45,29 +62,85 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
 
   void rebuildJson() {
     if (json.isNotEmpty) {
-      typeWrapper = buildTypeValueTree(
-        json: json,
-        typeName: _modelName,
-        name: _modelName.firstToLowerCase(),
-      );
-      rebuild();
+      _buildTreeWrapper();
     }
+  }
+
+  void _buildTreeWrapper() {
+    _allTypeWrappers.clear();
+    typeWrapper = buildTypeValueTree(
+      json: json,
+      typeName: _modelName,
+      name: _modelName.firstToLowerCase(),
+    );
+    _tryFindSimilarStructuresAndJoinThem();
+    rebuild();
+  }
+
+  /// Sometimes the same structures are used under different key names
+  /// in json. This method tries to detect such cases and to use
+  /// the same class for all of them
+  void _tryFindSimilarStructuresAndJoinThem() {
+    if (typeWrapper?.values == null || !tryMergeSimilarTypes) {
+      return;
+    }
+    for (var existingWrapper in _allTypeWrappers) {
+      for (var currentWrapper in _allTypeWrappers) {
+        if (currentWrapper.searchKey == existingWrapper.searchKey) {
+          continue;
+        }
+        bool isSimilarToExisting = _isSimilarTypeWrappers(
+          currentWrapper,
+          existingWrapper,
+        );
+        if (isSimilarToExisting) {
+          currentWrapper.typeName = existingWrapper.typeName;
+        }
+      }
+    }
+
+    for (var wrapper in _allTypeWrappers) {
+      if (!_filteredTypeWrappers.any((e) => e.typeName == wrapper.typeName)) {
+        _filteredTypeWrappers.add(wrapper);
+      }
+    }
+    for (var wrapper in _filteredTypeWrappers) {
+      wrapper.convertTypeWrappersToValueWrappers();
+    }
+    print(_filteredTypeWrappers);
+  }
+
+  bool _isSimilarTypeWrappers(
+    TypeWrapper first,
+    TypeWrapper second,
+  ) {
+    for (var keyName in first.keyNames) {
+      if (!second.keyNames.contains(keyName)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void enterExample() {
+    reset();
+    onJsonEnter(_exampleJson);
   }
 
   Future onJsonEnter(String value) async {
     try {
       _error = null;
       json = jsonDecode(value);
-      typeWrapper = buildTypeValueTree(
-        json: json,
-        typeName: _modelName,
-        name: _modelName.firstToLowerCase(),
-      );
+      _buildTreeWrapper();
     } catch (e) {
       json = {};
       _error = 'Invalid JSON';
     }
     rebuild();
+  }
+
+  bool get hasData {
+    return typeWrapper != null;
   }
 
   TypeWrapper buildTypeValueTree({
@@ -84,12 +157,14 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     for (var kv in json.entries) {
       if (kv.value is Map) {
         final tName = kv.key.firstToUpperCase();
+        final typeWrapper = buildTypeValueTree(
+          json: kv.value,
+          typeName: tName,
+          name: kv.key,
+        );
+        _allTypeWrappers.add(typeWrapper);
         values.add(
-          buildTypeValueTree(
-            json: kv.value,
-            typeName: tName,
-            name: kv.key,
-          ),
+          typeWrapper,
         );
       } else {
         values.add(
@@ -104,169 +179,17 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   @override
-  void reset() {}
+  void reset() {
+    _error = null;
+    _allTypeWrappers.clear();
+    _filteredTypeWrappers.clear();
+    json.clear();
+    typeWrapper = null;
+    rebuild();
+  }
+
   @override
   void onLocalStorageInitialized() {
     _registerLanguages();
   }
-}
-
-class TypeWrapper extends Wrapper {
-  List<Wrapper> values;
-  String? typeName;
-  TypeWrapper({
-    required String name,
-    required this.values,
-    required this.typeName,
-  }) : super(
-          keyName: name,
-        );
-
-  @override
-  set isNullable(bool value) {
-    super.isNullable = value;
-    for (var v in values) {
-      if (v.isChangedManually) {
-        continue;
-      }
-      v.isNullable = value;
-    }
-  }
-
-  String get proposedTypeName {
-    const suffix = '?';
-    if (alternativeTypeName != null) {
-      return '$alternativeTypeName$suffix';
-    }
-    return '${typeName ?? super.keyName.firstToUpperCase()}$suffix';
-  }
-}
-
-class ValueWrapper extends Wrapper {
-  static final RegExp _doubleRegexp = RegExp(r'^(-?)(0|([1-9][0-9]*))(\.[0-9]+)?$');
-
-  Object? value;
-  Object? alternativeDefaultValue;  
-
-  ValueWrapper({
-    required String keyName,
-    this.value,
-  }) : super(keyName: keyName);
-
-  /// Balances or prices most probably must be doubles event they come as
-  /// `int` in a json
-  bool get _doubleMightBeUseful {
-    final lowerName = (alternativeKeyName ?? keyName).toLowerCase();
-    return (lowerName.contains('balance') ||
-        lowerName.contains('price') ||
-        lowerName.contains('fee') ||
-        lowerName.contains('commission') ||
-        lowerName.contains('payment') ||
-        lowerName.contains('pay') ||
-        lowerName.contains('amount'));
-  }
-
-  bool get _dateTimeMightBeUseful {
-    final lowerName = (alternativeKeyName ?? keyName).toLowerCase();
-    return lowerName.contains('createdAt') ||
-        lowerName.contains('updatedAt') ||
-        lowerName.contains('date') ||
-        lowerName.contains('time');
-  }
-
-  @override
-  set isNullable(bool value) {
-    if (!canBeNullable) {
-      value = true;
-    }
-    super.isNullable = value;
-  }
-  
-  bool get canBeNullable {
-    return defaultValue != null;
-  }
-
-  Object? get defaultValue {
-    if (alternativeDefaultValue != null) {
-      return alternativeDefaultValue!;
-    }
-    final typeName = proposedTypeName.replaceAll('?', '');
-
-    // if (typeName.endsWith('?')) {
-    //   return null;
-    // }
-    switch (typeName) {
-      case 'int':
-        return 0;
-      case 'double':
-        return 0.0;
-      case 'bool':
-        return false;
-      case 'String':
-        return '';
-    }
-    return null;
-  }
-
-  String get proposedTypeName {
-    if (alternativeTypeName != null) {
-      return alternativeTypeName!;
-    }
-    if (value == null) {
-      return 'Object?';
-    }
-    final suffix = _isNullable ? '?' : '';
-    if (value is String) {
-      String v = value as String;
-      if (v.contains('.')) {
-        if (_doubleRegexp.hasMatch(v)) {
-          return 'double$suffix';
-        }
-        // return 'String$suffix';
-      }
-      if (int.tryParse(v) != null) {
-        return 'int$suffix';
-      }
-      if (DateTime.tryParse(v) != null || _dateTimeMightBeUseful) {
-        return 'DateTime$suffix';
-      }
-      if (v.toLowerCase() == 'true' || v.toLowerCase() == 'false') {
-        return 'bool$suffix';
-      }
-    }
-    if (value is double || _doubleMightBeUseful) {
-      return 'double$suffix';
-    } else if (value is int) {
-      return 'int$suffix';
-    }
-
-    if (value is bool) {
-      return 'bool$suffix';
-    }
-    return '${value.runtimeType.toString()}$suffix';
-  }
-}
-
-class Wrapper {
-  String keyName;
-  bool _isNullable = true;
-  set isNullable(bool value) {
-    _isNullable = value;
-  }
-
-  bool get isNullable {
-    return _isNullable;
-  }
-
-  String? alternativeKeyName;
-
-  bool isChangedManually = false;
-
-  /// If proposed type name is incorrect, you can set an alternative
-  /// type name manually
-  String? alternativeTypeName;
-
-  Wrapper({
-    required this.keyName,
-  });
 }
