@@ -24,7 +24,7 @@ class ObjectTree extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.all(8.0),
               child: Text(
-                'This tree does not correspond to the JSON structure. It only displays the inner classes. If you want it to correspond to the real structure, deselect `Merge similar classes`. But in this case you might end up with many different classes that have exactly the same structure but different names',
+                '"Merge Similar Models" mode (default).\nIn this mode you see only the models grouped by similar structures. This mode is preferred since there might be many inner structures with the exact same set of fields. They will be grouped into shared classes',
               ),
             ),
             TypeView(
@@ -36,8 +36,19 @@ class ObjectTree extends StatelessWidget {
     }
 
     return SingleChildScrollView(
-      child: TypeView(
-        data: typeWrapper,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              '"Generate Distinct Models" mode.\nIn this mode you will get a distinct class for each inner structure. This approach allows you do set default values for all of them but the downside is that you will end up (potentially) with many classes with exactly the same structure but different names. I recommend using "Merge Similar Models" mode instead',
+            ),
+          ),
+          TypeView(
+            data: typeWrapper,
+          ),
+        ],
       ),
     );
   }

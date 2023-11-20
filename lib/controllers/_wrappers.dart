@@ -1,4 +1,4 @@
-// ignore_for_file: unnecessary_getters_setters
+// ignore_for_file: unnecessary_getters_setters, unused_field
 
 part of 'json_tree_controller.dart';
 
@@ -56,6 +56,7 @@ class TypeWrapper extends Wrapper {
     }
   }
 
+  @override
   String get proposedTypeName {
     const suffix = '?';
     if (alternativeTypeName != null) {
@@ -63,6 +64,12 @@ class TypeWrapper extends Wrapper {
     }
     return '${typeName ?? super.keyName.firstToUpperCase()}$suffix';
   }
+
+  @override
+  String get proposedKeyName => alternativeKeyName ?? keyName;
+  
+  @override
+  Object? get defaultValue => null;
 }
 
 class ValueWrapper extends Wrapper {
@@ -93,7 +100,7 @@ class ValueWrapper extends Wrapper {
   /// Balances or prices most probably must be doubles event they come as
   /// `int` in a json
   bool get _doubleMightBeUseful {
-    final lowerName = (alternativeKeyName ?? keyName).toLowerCase();
+    final lowerName = proposedKeyName.toLowerCase();
     return (lowerName.contains('balance') ||
         lowerName.contains('price') ||
         lowerName.contains('fee') ||
@@ -104,7 +111,7 @@ class ValueWrapper extends Wrapper {
   }
 
   bool get _dateTimeMightBeUseful {
-    final lowerName = (alternativeKeyName ?? keyName).toLowerCase();
+    final lowerName = proposedKeyName.toLowerCase();
     return lowerName.contains('createdAt') ||
         lowerName.contains('updatedAt') ||
         lowerName.contains('date') ||
@@ -134,6 +141,7 @@ class ValueWrapper extends Wrapper {
     return Colors.purple;
   }
 
+  @override
   Object? get defaultValue {
     if (alternativeDefaultValue != null) {
       return alternativeDefaultValue!;
@@ -148,11 +156,12 @@ class ValueWrapper extends Wrapper {
       case 'bool':
         return false;
       case 'String':
-        return '';
+        return "''";
     }
     return null;
   }
 
+  @override
   String get proposedTypeName {
     if (alternativeTypeName != null) {
       return alternativeTypeName!;
@@ -190,14 +199,25 @@ class ValueWrapper extends Wrapper {
     }
     return '${value.runtimeType.toString()}$suffix';
   }
+
+  @override
+  String get proposedKeyName => alternativeKeyName ?? keyName;
 }
 
-class Wrapper {
+abstract class Wrapper {
   String keyName;
   bool _isNullable = true;
   set isNullable(bool value) {
     _isNullable = value;
   }
+
+  bool _isBuiltInType = true;
+  bool get isBuiltInType => _isBuiltInType;
+
+  String get proposedTypeName;
+  String get proposedKeyName;
+
+  Object? get defaultValue;
 
   bool get isNullable {
     return _isNullable;

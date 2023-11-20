@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_const_literals_to_create_immutables, prefer_const_constructors
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:json_serializable_model_builder/controllers/json_tree_controller.dart';
 import 'package:json_serializable_model_builder/dialogs/show_cupertino_confirmation.dart';
@@ -48,72 +49,154 @@ class _JsonTreePageState extends State<JsonTreePage> {
             appBar: AppBar(
               backgroundColor: Theme.of(context).colorScheme.primary,
               title: const Text(
-                'Build Json Serializable Model',
+                'Build `json_serializable` Model',
+                style: TextStyle(color: Colors.white),
               ),
             ),
             body: SafeArea(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: flex1,
-                          child: Row(
-                            children: [
-                              IconButton.outlined(
-                                tooltip: 'Regenerate Model',
-                                onPressed: () async {
-                                  if (await showCupertinoConfirmation(
-                                    context: context,
-                                    description:
-                                        'Do you want to reset all your changes and rebuild the model from scratch?',
-                                  )) {
-                                    jsonTreeController.rebuildJson();
-                                  }
-                                },
-                                icon: const Icon(Icons.refresh),
+              child: LiteFormGroup(
+                name: JsonTreeController.kSettingsFormName,
+                builder: (context, scrollController) {
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: flex1,
+                              child: Row(
+                                children: [
+                                  IconButton.outlined(
+                                    tooltip: 'Regenerate Model',
+                                    onPressed: () async {
+                                      if (kDebugMode ||
+                                          await showCupertinoConfirmation(
+                                            context: context,
+                                            description:
+                                                'Do you want to reset all your changes and rebuild the model from scratch?',
+                                          )) {
+                                        jsonTreeController.rebuildJson();
+                                      }
+                                    },
+                                    icon: const Icon(Icons.refresh),
+                                  ),
+                                  if (jsonTreeController.hasData)
+                                    IconButton.outlined(
+                                      tooltip: 'Save Model',
+                                      onPressed: jsonTreeController.saveModel,
+                                      icon: const Icon(Icons.save_alt_rounded),
+                                    ),
+                                  LiteDropSelector(
+                                    dropSelectorActionType:
+                                        LiteDropSelectorActionType.multiselect,
+                                    paddingRight: 8.0,
+                                    selectorViewBuilder: (context, selectedItems) {
+                                      return Container(
+                                        color: Colors.transparent,
+                                        child: IgnorePointer(
+                                          child: selectedItems.isEmpty
+                                              ? IconButton.outlined(
+                                                  onPressed: () {},
+                                                  icon: Stack(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.settings,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              : IconButton.filledTonal(
+                                                  onPressed: () {},
+                                                  icon: Stack(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.settings,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                        ),
+                                      );
+                                    },
+                                    name: 'jsonSettings',
+                                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                                    initialValue: jsonTreeController.selectedTypes,
+                                    serializer: (value) async {
+                                      if (value is List) {
+                                        return value.map((e) => e.payload).toList();
+                                      }
+                                      return value;
+                                    },
+                                    onChanged: (value) {
+                                      jsonTreeController.rebuildJson();
+                                    },
+                                    items: [
+                                      LiteDropSelectorItem(
+                                        title: 'Merge Similar Models',
+                                        payload: JsonSettingType.mergeSimilar,
+                                        iconBuilder: (context, item, isSelected) {
+                                          return Icon(
+                                            Icons.merge,
+                                            color: Colors.blue,
+                                          );
+                                        },
+                                      ),
+                                      LiteDropSelectorItem(
+                                        title: 'Prefer Nullable',
+                                        payload: JsonSettingType.preferNullable,
+                                        iconBuilder: (context, item, isSelected) {
+                                          return Icon(
+                                            Icons.check_circle_outline,
+                                            color: Colors.green,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            Expanded(
+                              flex: flex2,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  if (!jsonTreeController.hasData)
+                                    MaterialButton(
+                                      onPressed: jsonTreeController.enterExample,
+                                      child: const Text('Example JSON'),
+                                    ),
+                                  _buildClearButton(),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        Expanded(
-                          flex: flex2,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              if (!jsonTreeController.hasData)
-                                MaterialButton(
-                                  onPressed: jsonTreeController.enterExample,
-                                  child: const Text('Example JSON'),
-                                ),
-                              _buildClearButton(),
-                            ],
-                          ),
+                      ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: flex1,
+                              child: ObjectTree(),
+                            ),
+                            // const VerticalDivider(
+                            //   width: .5,
+                            // ),
+                            Expanded(
+                              flex: flex2,
+                              child: RawJsonContainer(),
+                            )
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: flex1,
-                          child: ObjectTree(),
-                        ),
-                        const VerticalDivider(
-                          width: .5,
-                        ),
-                        Expanded(
-                          flex: flex2,
-                          child: RawJsonContainer(),
-                        )
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),

@@ -32,17 +32,11 @@ class _ValueViewState extends State<ValueView> {
       TextStyle? valueStyle = Theme.of(context).textTheme.bodyMedium!.copyWith(
             color: Colors.lightBlue,
           );
-      if (defaultValue is String) {
-        children.add(Text(
-          '"$defaultValue"',
-          style: valueStyle,
-        ));
-      } else {
-        children.add(Text(
-          '$defaultValue',
-          style: valueStyle,
-        ));
-      }
+
+      children.add(Text(
+        '$defaultValue',
+        style: valueStyle,
+      ));
       return Row(
         children: children,
       );
@@ -91,38 +85,44 @@ class _ValueViewState extends State<ValueView> {
           borderRadius: BorderRadius.circular(6.0),
         ),
         elevation: .1,
-        child: Padding(
-          padding: const EdgeInsets.all(4.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        widget.data.proposedTypeName,
-                        style: style.copyWith(
-                          color: widget.data.typeColor,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6.0),
+          splashColor: Colors.black.withOpacity(.02),
+          highlightColor: Colors.transparent,
+          onTap: () {},
+          child: Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.data.proposedTypeName,
+                          style: style.copyWith(
+                            color: widget.data.typeColor,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(
-                      width: 4.0,
-                    ),
-                    Flexible(
-                      child: Text(
-                        widget.data.keyName,
+                      const SizedBox(
+                        width: 4.0,
                       ),
-                    ),
-                    const SizedBox(
-                      width: 4.0,
-                    ),
-                    _buildDefaultValue(),
-                  ],
+                      Flexible(
+                        child: Text(
+                          widget.data.keyName,
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 4.0,
+                      ),
+                      _buildDefaultValue(),
+                    ],
+                  ),
                 ),
-              ),
-              _buildCheckBox(),
-            ],
+                _buildCheckBox(),
+              ],
+            ),
           ),
         ),
       ),

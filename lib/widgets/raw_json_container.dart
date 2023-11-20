@@ -9,31 +9,34 @@ class RawJsonContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Container(
-            color: Theme.of(context).cardColor,
-            width: double.infinity,
-            height: double.infinity,
-            child: jsonTreeController.showHighlightedText
-                ? JsonHighlighter(
-                    value: jsonTreeController.formattedJson,
-                  )
-                : TextFormField(
-                    maxLines: 1000000,
-                    controller: jsonTreeController.jsonController,
-                    onChanged: jsonTreeController.onJsonEnter,
-                    decoration: const InputDecoration.collapsed(
-                      hintText: 'Paste your JSON here',
+    return Container(
+      // color: Colors.grey[50],
+      color: Theme.of(context).primaryColor.withOpacity(.02),
+      child: Column(
+        children: [
+          Expanded(
+            child: SizedBox(
+              width: double.infinity,
+              height: double.infinity,
+              child: jsonTreeController.showHighlightedText
+                  ? JsonHighlighter(
+                      value: jsonTreeController.formattedJson,
+                    )
+                  : TextFormField(
+                      maxLines: 1000000,
+                      controller: jsonTreeController.jsonController,
+                      onChanged: jsonTreeController.onJsonEnter,
+                      decoration: const InputDecoration.collapsed(
+                        hintText: 'Paste your JSON here',
+                      ),
+                      inputFormatters: [
+                        JsonFormatter(),
+                      ],
                     ),
-                    inputFormatters: [
-                      JsonFormatter(),
-                    ],
-                  ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

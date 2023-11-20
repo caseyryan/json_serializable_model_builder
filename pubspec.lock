@@ -388,10 +388,10 @@ packages:
     dependency: "direct main"
     description:
       name: lite_forms
-      sha256: c5b5dd9b74f03512397aa1ee7fb21234c697d5a096045ce57f2354d5afcde011
+      sha256: aeffa36559427f653ced6357c88b51d652e08650fd395791567fb7aa3913018f
       url: "https://pub.dev"
     source: hosted
-    version: "0.0.13"
+    version: "0.0.14"
   lite_state:
     dependency: transitive
     description:

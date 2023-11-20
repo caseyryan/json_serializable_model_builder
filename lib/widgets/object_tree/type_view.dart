@@ -7,9 +7,11 @@ class TypeView extends StatefulWidget {
   const TypeView({
     super.key,
     required this.data,
+    this.addOuterWrapper = true,
   });
 
   final TypeWrapper data;
+  final bool addOuterWrapper;
 
   @override
   State<TypeView> createState() => _TypeViewState();
@@ -36,9 +38,65 @@ class _TypeViewState extends State<TypeView> {
     return children;
   }
 
+  Widget _buildOuterWrapper() {
+    if (!widget.addOuterWrapper) {
+      return const SizedBox.shrink();
+    }
+    final style = Theme.of(context).textTheme.bodyMedium!;
+    return Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  widget.data.proposedTypeName,
+                  style: style.copyWith(
+                    color: const Color.fromARGB(255, 13, 106, 16),
+                  ),
+                ),
+              ),
+              const SizedBox(
+                width: 4.0,
+              ),
+              Flexible(
+                child: Text(
+                  widget.data.keyName,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          children: [
+            Text(
+              'Nullable Values',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(
+              width: 4.0,
+            ),
+            SizedBox(
+              height: 20.0,
+              width: 20.0,
+              child: Checkbox(
+                value: widget.data.isNullable,
+                visualDensity: VisualDensity.adaptivePlatformDensity,
+                onChanged: (value) {
+                  widget.data.isNullable = !widget.data.isNullable;
+                  jsonTreeController.rebuild();
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyMedium!;
+    
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Material(
@@ -50,55 +108,7 @@ class _TypeViewState extends State<TypeView> {
           padding: const EdgeInsets.all(8.0),
           child: Column(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            widget.data.proposedTypeName,
-                            style: style.copyWith(
-                              color: const Color.fromARGB(255, 13, 106, 16),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 4.0,
-                        ),
-                        Flexible(
-                          child: Text(
-                            widget.data.keyName,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Text(
-                        'Nullable Values',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(
-                        width: 4.0,
-                      ),
-                      SizedBox(
-                        height: 20.0,
-                        width: 20.0,
-                        child: Checkbox(
-                          value: widget.data.isNullable,
-                          visualDensity: VisualDensity.adaptivePlatformDensity,
-                          onChanged: (value) {
-                            widget.data.isNullable = !widget.data.isNullable;
-                            jsonTreeController.rebuild();
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              _buildOuterWrapper(),
               ..._buildChildren(),
             ],
           ),

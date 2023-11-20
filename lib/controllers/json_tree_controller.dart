@@ -6,11 +6,19 @@ import 'package:flutter/material.dart';
 import 'package:highlight/highlight_core.dart' show highlight;
 import 'package:highlight/languages/dart.dart' as dart_lang;
 import 'package:highlight/languages/json.dart' as json_lang;
+import 'package:json_serializable_model_builder/extensions/string_extensions.dart';
+import 'package:lite_forms/controllers/lite_form_controller.dart';
 import 'package:lite_forms/utils/exports.dart';
 import 'package:lite_state/lite_state.dart';
 
 part '_example_json.dart';
+part '_json_serializable_template.dart';
 part '_wrappers.dart';
+
+enum JsonSettingType {
+  preferNullable,
+  mergeSimilar,
+}
 
 JsonTreeController get jsonTreeController {
   return findController<JsonTreeController>();
@@ -18,6 +26,8 @@ JsonTreeController get jsonTreeController {
 
 class JsonTreeController extends LiteStateController<JsonTreeController> {
   final TextEditingController jsonController = TextEditingController();
+
+  static const String kSettingsFormName = 'jsonSettingsForm';
 
   String? _error;
   String? get error => _error;
@@ -29,7 +39,15 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   final List<TypeWrapper> _filteredTypeWrappers = [];
   List<TypeWrapper> get filteredTypeWrappers => _filteredTypeWrappers;
 
-  bool tryMergeSimilarTypes = true;
+  List<JsonSettingType> _selectedTypes = [
+    JsonSettingType.mergeSimilar,
+    JsonSettingType.preferNullable,
+  ];
+
+  List<JsonSettingType> get selectedTypes => _selectedTypes;
+
+  bool get tryMergeSimilarTypes => _selectedTypes.contains(JsonSettingType.mergeSimilar);
+  bool get preferNullable => _selectedTypes.contains(JsonSettingType.preferNullable);
 
   TypeWrapper get mergedTypeWrapper {
     return TypeWrapper(
@@ -60,7 +78,17 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     return const JsonEncoder.withIndent(' ').convert(json);
   }
 
-  void rebuildJson() {
+  Future saveModel() async {
+    final wrappers = tryMergeSimilarTypes ? _filteredTypeWrappers : _allTypeWrappers;
+    for (var wrapper in wrappers) {
+      final filledTemplate = jsonSerializableTemplateFromWrapper(wrapper);
+      print(filledTemplate);
+    }
+  }
+
+  Future rebuildJson() async {
+    final data = await getFormData(formName: kSettingsFormName);
+    _selectedTypes = (data['jsonSettings'] as List).cast<JsonSettingType>();
     if (json.isNotEmpty) {
       _buildTreeWrapper();
     }
@@ -68,6 +96,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
 
   void _buildTreeWrapper() {
     _allTypeWrappers.clear();
+    _filteredTypeWrappers.clear();
     typeWrapper = buildTypeValueTree(
       json: json,
       typeName: _modelName,
@@ -153,6 +182,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
       values: values,
       typeName: typeName,
     );
+    _allTypeWrappers.add(wrapper);
     for (var kv in json.entries) {
       if (kv.value is Map) {
         final tName = kv.key.firstToUpperCase();
@@ -173,6 +203,9 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
           ),
         );
       }
+    }
+    for (var w in _allTypeWrappers) {
+      w.isNullable = preferNullable;
     }
     return wrapper;
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:json_serializable_model_builder/controllers/json_tree_controller.dart';
 import 'package:lite_forms/lite_forms.dart';
+import 'package:lite_forms/utils/controller_initializer.dart';
+import 'package:lite_forms/utils/lite_forms_configuration.dart';
 
 import 'json_tree_page.dart';
 
@@ -26,6 +28,9 @@ class _MyAppState extends State<MyApp> {
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ],
+    );
+    initializeLiteForms(
+      config: LiteFormsConfiguration.thinFields(context),
     );
     initControllers({
       JsonTreeController:() => JsonTreeController(),
