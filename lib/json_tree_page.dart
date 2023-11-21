@@ -184,9 +184,6 @@ class _JsonTreePageState extends State<JsonTreePage> {
                               flex: flex1,
                               child: ObjectTree(),
                             ),
-                            // const VerticalDivider(
-                            //   width: .5,
-                            // ),
                             Expanded(
                               flex: flex2,
                               child: RawJsonContainer(),

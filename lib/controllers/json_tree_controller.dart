@@ -6,14 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:highlight/highlight_core.dart' show highlight;
 import 'package:highlight/languages/dart.dart' as dart_lang;
 import 'package:highlight/languages/json.dart' as json_lang;
-import 'package:json_serializable_model_builder/extensions/string_extensions.dart';
+import 'package:json_serializable_model_builder/controllers/_json_token_tools.dart';
 import 'package:lite_forms/controllers/lite_form_controller.dart';
-import 'package:lite_forms/utils/exports.dart';
 import 'package:lite_state/lite_state.dart';
 
 part '_example_json.dart';
-part '_json_serializable_template.dart';
-part '_wrappers.dart';
 
 enum JsonSettingType {
   preferNullable,
@@ -32,12 +29,8 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   String? _error;
   String? get error => _error;
   Map<String, dynamic> json = {};
-  TypeWrapper? typeWrapper;
+  JsonTokenContainer? _tokenContainer;
   bool _langRegistered = false;
-
-  final List<TypeWrapper> _allTypeWrappers = [];
-  final List<TypeWrapper> _filteredTypeWrappers = [];
-  List<TypeWrapper> get filteredTypeWrappers => _filteredTypeWrappers;
 
   List<JsonSettingType> _selectedTypes = [
     JsonSettingType.mergeSimilar,
@@ -46,16 +39,10 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
 
   List<JsonSettingType> get selectedTypes => _selectedTypes;
 
-  bool get tryMergeSimilarTypes => _selectedTypes.contains(JsonSettingType.mergeSimilar);
-  bool get preferNullable => _selectedTypes.contains(JsonSettingType.preferNullable);
-
-  TypeWrapper get mergedTypeWrapper {
-    return TypeWrapper(
-      values: _filteredTypeWrappers,
-      typeName: _modelName,
-      name: _modelName.firstToLowerCase(),
-    );
-  }
+  bool get mergeSimilarTypes =>
+      _selectedTypes.contains(JsonSettingType.mergeSimilar);
+  bool get preferNullable =>
+      _selectedTypes.contains(JsonSettingType.preferNullable);
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
@@ -64,10 +51,10 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     rebuild();
   }
 
-  String _modelName = 'ClassName';
+  String _rootModelName = 'Root';
 
   void onModelNameChange(String value) {
-    _modelName = value;
+    _rootModelName = value;
   }
 
   bool get showHighlightedText {
@@ -79,11 +66,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   Future saveModel() async {
-    final wrappers = tryMergeSimilarTypes ? _filteredTypeWrappers : _allTypeWrappers;
-    for (var wrapper in wrappers) {
-      final filledTemplate = jsonSerializableTemplateFromWrapper(wrapper);
-      print(filledTemplate);
-    }
+    print('SAVE');
   }
 
   Future rebuildJson() async {
@@ -95,59 +78,16 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   void _buildTreeWrapper() {
-    _allTypeWrappers.clear();
-    _filteredTypeWrappers.clear();
-    typeWrapper = buildTypeValueTree(
+    _tokenContainer = jsonToTokenContainer(
       json: json,
-      typeName: _modelName,
-      name: _modelName.firstToLowerCase(),
+      rootTypeName: _rootModelName,
+      mergeSimilarTokens: mergeSimilarTypes,
     );
-    _tryFindSimilarStructuresAndJoinThem();
+    final templates = _tokenContainer!.toTemplates(
+      nullable: preferNullable,
+    );
+    print(templates);
     rebuild();
-  }
-
-  /// Sometimes the same structures are used under different key names
-  /// in json. This method tries to detect such cases and to use
-  /// the same class for all of them
-  void _tryFindSimilarStructuresAndJoinThem() {
-    if (typeWrapper?.values == null || !tryMergeSimilarTypes) {
-      return;
-    }
-    for (var existingWrapper in _allTypeWrappers) {
-      for (var currentWrapper in _allTypeWrappers) {
-        if (currentWrapper.searchKey == existingWrapper.searchKey) {
-          continue;
-        }
-        bool isSimilarToExisting = _isSimilarTypeWrappers(
-          currentWrapper,
-          existingWrapper,
-        );
-        if (isSimilarToExisting) {
-          currentWrapper.typeName = existingWrapper.typeName;
-        }
-      }
-    }
-
-    for (var wrapper in _allTypeWrappers) {
-      if (!_filteredTypeWrappers.any((e) => e.typeName == wrapper.typeName)) {
-        _filteredTypeWrappers.add(wrapper);
-      }
-    }
-    for (var wrapper in _filteredTypeWrappers) {
-      wrapper.convertTypeWrappersToValueWrappers();
-    }
-  }
-
-  bool _isSimilarTypeWrappers(
-    TypeWrapper first,
-    TypeWrapper second,
-  ) {
-    for (var keyName in first.keyNames) {
-      if (!second.keyNames.contains(keyName)) {
-        return false;
-      }
-    }
-    return true;
   }
 
   void enterExample() {
@@ -168,55 +108,14 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   bool get hasData {
-    return typeWrapper != null;
-  }
-
-  TypeWrapper buildTypeValueTree({
-    required Map<String, dynamic> json,
-    required String name,
-    String? typeName,
-  }) {
-    List<Wrapper> values = [];
-    TypeWrapper wrapper = TypeWrapper(
-      name: name,
-      values: values,
-      typeName: typeName,
-    );
-    _allTypeWrappers.add(wrapper);
-    for (var kv in json.entries) {
-      if (kv.value is Map) {
-        final tName = kv.key.firstToUpperCase();
-        final typeWrapper = buildTypeValueTree(
-          json: kv.value,
-          typeName: tName,
-          name: kv.key,
-        );
-        _allTypeWrappers.add(typeWrapper);
-        values.add(
-          typeWrapper,
-        );
-      } else {
-        values.add(
-          ValueWrapper(
-            keyName: kv.key,
-            value: kv.value,
-          ),
-        );
-      }
-    }
-    for (var w in _allTypeWrappers) {
-      w.isNullable = preferNullable;
-    }
-    return wrapper;
+    return _tokenContainer != null;
   }
 
   @override
   void reset() {
     _error = null;
-    _allTypeWrappers.clear();
-    _filteredTypeWrappers.clear();
+    _tokenContainer = null;
     json.clear();
-    typeWrapper = null;
     rebuild();
   }
 
