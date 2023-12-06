@@ -1,36 +1,72 @@
+import 'dart:collection';
+
+import 'package:flutter/material.dart';
 import 'package:json_serializable_model_builder/extensions/string_extensions.dart';
 import 'package:lite_forms/utils/exports.dart';
+import 'package:rich_clipboard/rich_clipboard.dart';
 
 /// [rootTypeName]
 /// [mergeSimilarTokens] the tool will try to find
 /// different JSON tokens (classes) with similar structure
 /// and merge them into one. This way the repeated structures
 /// will be using the same `dart` class instead of many
+/// [useDerivedTypePrompts] means that the tool will try to guess a more
+/// correct type of a primitive value based on its key name
+/// e.g. If it got [int] value from JSON but the key is called `price` or `balance` ...
+/// then it most probably should be [double] instead etc.
 JsonTokenContainer jsonToTokenContainer({
   required Map json,
   String? rootTypeName,
   bool mergeSimilarTokens = true,
+  bool useDerivedTypePrompts = true,
 }) {
   List<JsonToken> allTokens = [];
   final JsonToken token = _tokenize(
-    value: json,
+    input: json,
     typeName: rootTypeName ?? 'Root',
     keyName: null,
     allTokens: allTokens,
+    useDerivedTypePrompts: useDerivedTypePrompts,
   ) as JsonToken;
 
   /// root token must also be in this list
-  allTokens.insert(0, token);
+  // allTokens.insert(0, token);
 
   if (mergeSimilarTokens) {
     /// merging
-    final temp = <JsonToken>[];
-    for (var currentToken in allTokens) {
-      if (!temp.any((t) => t._compareKey == currentToken._compareKey)) {
-        temp.add(currentToken);
+    final similar = <String, List<JsonToken>>{};
+
+    for (var token in allTokens) {
+      if (!similar.containsKey(token._compareKey)) {
+        similar[token._compareKey] = [
+          token,
+        ];
+      } else {
+        similar[token._compareKey]!.add(token);
       }
     }
-    allTokens = temp;
+
+    /// This logic only removes full duplicates
+    /// But there also might be very similar types, e.g.
+    /// the types with a complete subset of fields of other
+    /// but that other type has more keys. In this case
+    /// they are marked as similar
+    final duplicateTypes = <JsonToken>[];
+    for (var kv in similar.entries) {
+      final listOfSimilar = kv.value;
+      if (listOfSimilar.length > 1) {
+        final tokenWithShortestName = _findTokenWithShortestName(listOfSimilar);
+        for (var token in kv.value) {
+          token.copyTypeInfoFrom(tokenWithShortestName);
+          if (token != tokenWithShortestName) {
+            duplicateTypes.add(token);
+          }
+        }
+      }
+    }
+    for (var dup in duplicateTypes) {
+      allTokens.remove(dup);
+    }
   }
 
   return JsonTokenContainer(
@@ -39,22 +75,45 @@ JsonTokenContainer jsonToTokenContainer({
   );
 }
 
+JsonToken _findTokenWithShortestName(
+  List<JsonToken> value,
+) {
+  if (value.length < 2) {
+    return value.first;
+  }
+  JsonToken shortest = value.first;
+  for (var token in value) {
+    if (token.typeName.length < shortest.typeName.length) {
+      shortest = token;
+    }
+  }
+
+  return shortest;
+}
+
 class JsonTokenContainer {
   JsonToken rootToken;
   List<JsonToken> allTokens;
   JsonTokenContainer({
     required this.rootToken,
     required this.allTokens,
-  });
-
-  List<Template> toTemplates({
-    bool nullable = true,
   }) {
+    for (var token in allTokens) {
+      token._parentContainer = this;
+      token._listGenericType?._parentContainer = this;
+      for (var f in token.fields) {
+        f._parentContainer = this;
+        f._listGenericType?._parentContainer = this;
+      }
+    }
+  }
+
+  bool isNullable = false;
+
+  List<Template> generateTemplates() {
     final list = <Template>[];
     for (var token in allTokens) {
-      final template = token.toTemplate(
-        nullable: nullable,
-      );
+      final template = token.toTemplate();
       if (template != null) {
         list.add(template);
       }
@@ -68,36 +127,35 @@ Object? _tokenize({
   required String typeName,
   required String? keyName,
   required List<JsonToken> allTokens,
-  Object? value,
+  required bool useDerivedTypePrompts,
+  Object? input,
   List<String>? path,
 }) {
-  if (keyName == null && value is! Map) {
+  if (keyName == null && input is! Map) {
     throw 'The top level of your model must me a Map';
   }
   if (keyName == null || path == null) {
     path = [];
   }
-  // if (keyName != null) {
-  //   path.add(keyName);
-  // }
 
-  if (value is Map) {
-    final token = JsonToken()
+  if (input is Map) {
+    final token = JsonToken.mapped()
       .._keyName = keyName
-      .._typeName = typeName
-      .._path = path.join(' -> ')
-      .._value = {};
-    for (var kv in value.entries) {
+      .._useDerivedTypePrompts = useDerivedTypePrompts
+      .._typeName = typeName;
+    allTokens.add(token);
+    for (var kv in input.entries) {
       final keyName = kv.key;
       final innerTypeName = kv.toTypeName();
       final value = _tokenize(
         typeName: innerTypeName,
         keyName: keyName,
-        value: kv.value,
+        input: kv.value,
         allTokens: allTokens,
+        useDerivedTypePrompts: useDerivedTypePrompts,
         path: path,
       );
-      (token._value as Map)[keyName] = value;
+      token.addValue(value);
       if (value is List) {
         for (var a in value) {
           if (a is JsonToken) {
@@ -105,33 +163,42 @@ Object? _tokenize({
             break;
           }
         }
-      } else if (value is JsonToken) {
-        allTokens.add(value);
       }
     }
     return token;
-  } else if (value is List && value.isNotEmpty) {
+  } else if (input is List && input.isNotEmpty) {
     final newToken = JsonToken()
       .._typeName = typeName
+      .._useDerivedTypePrompts = useDerivedTypePrompts
       .._keyName = null
-      .._path = path.join(' -> ')
       .._value = _tokenize(
         typeName: typeName,
         keyName: keyName,
-        value: value.first,
+        input: input.first,
         allTokens: allTokens,
+        useDerivedTypePrompts: useDerivedTypePrompts,
         path: path,
       );
     if (!newToken.isPrimitiveValue) {
       allTokens.add(newToken);
     }
-    return [newToken];
+
+    /// We don't have to set type here
+    /// because it will be derived from _listGenericType
+    final listToken = JsonToken.listed()
+      .._keyName = keyName
+      .._listGenericType = newToken;
+
+    listToken.asList.add(newToken);
+    listToken._useDerivedTypePrompts = useDerivedTypePrompts;
+
+    return listToken;
   } else {
     final newToken = JsonToken()
       .._keyName = keyName
+      .._useDerivedTypePrompts = useDerivedTypePrompts
       .._typeName = typeName
-      .._path = path.join(' -> ')
-      .._value = value;
+      .._value = input;
     if (!newToken.isPrimitiveValue) {
       allTokens.add(newToken);
     }
@@ -144,28 +211,102 @@ class JsonToken {
     r'^(-?)(0|([1-9][0-9]*))(\.[0-9]+)?$',
   );
 
+  JsonTokenContainer? _parentContainer;
+
+  // @override
+  // bool operator ==(covariant JsonToken other) {
+  //   return other._compareKey == _compareKey;
+  // }
+
+  // @override
+  // int get hashCode {
+  //   return _compareKey.hashCode;
+  // }
+
+  /// If type is list, its generic type will be set here
+  JsonToken? _listGenericType;
+
+  JsonToken();
+
+  /// it can contain [JsonToken] values
+  /// or Lists
+  List<Object>? _keyValues;
+
   /// The name of the type that was derived from
   /// the JSON key or a value. It the default value
   /// which can be changed later
   String? _typeName;
   String? _keyName;
-  Object? _value;
-
-  String? __compareKey;
-
-  String? get _compareKey {
-    if (_value is Map) {
-      __compareKey ??= (_value as Map).keys.join();
-    } else if (_value is JsonToken) {
-      return (_value as JsonToken)._compareKey;
-    }
-    return __compareKey;
+  String? get keyName {
+    return _keyName;
   }
 
+  Object? _value;
+  bool _useDerivedTypePrompts = true;
   String? _autoCorrectedType;
   String? _manualType;
   Object? _manualDefaultValue;
-  String? _path;
+
+  bool get isComplexType {
+    return _keyValues != null;
+  }
+
+  factory JsonToken.mapped() {
+    return JsonToken().._keyValues = [];
+  }
+
+  void addValue(Object? value) {
+    if (isComplexType && value != null) {
+      _keyValues!.add(value);
+    }
+  }
+
+  factory JsonToken.listed() {
+    return JsonToken().._value = [];
+  }
+
+  @override
+  String toString() {
+    return '[JsonToken: $typeName]';
+  }
+
+  List get asList {
+    if (!isListToken) {
+      return const [];
+    }
+    return (_value! as List).whereType<JsonToken>().toList();
+  }
+
+  bool get isListToken {
+    return _value is List;
+  }
+
+  String? __compareKey;
+
+  void copyTypeInfoFrom(JsonToken other) {
+    _typeName = other._typeName;
+    _autoCorrectedType = other._autoCorrectedType;
+    _manualType = other._manualType;
+  }
+
+  String get _compareKey {
+    if (isComplexType) {
+      if (__compareKey == null) {
+        final sortedKeys = _keyValues!.map((e) => (e as JsonToken)._keyName).toList()..sort();
+        __compareKey = sortedKeys.join();
+      }
+    } else if (_value is JsonToken) {
+      return (_value as JsonToken)._compareKey;
+    }
+    return __compareKey!;
+  }
+
+  String _getJsonKeyAnnotation() {
+    final buffer = StringBuffer();
+
+    // @JsonKey(name: 'user_msg')
+    return buffer.toString();
+  }
 
   bool _isTypeSetManually = false;
   bool get isTypeSetManually => _isTypeSetManually;
@@ -178,9 +319,15 @@ class JsonToken {
     _manualDefaultValue = value;
   }
 
-  String get defaultValueView {
-    if (defaultValue != null && !isAlwaysNullable) {
-      return ' = $defaultValue';
+  bool get _isNullable {
+    return _parentContainer!.isNullable;
+  }
+
+  String getDefaultValueView() {
+    if (!_isNullable) {
+      if (defaultValue != null && !isAlwaysNullable) {
+        return ' = $defaultValue';
+      }
     }
     return '';
   }
@@ -206,17 +353,23 @@ class JsonToken {
     return null;
   }
 
-  String getFullTypeName(bool nullable) {
-    return '${typeName}${_getTypeSuffix(nullable)}';
+  List<JsonToken> get fields {
+    return _keyValues?.whereType<JsonToken>().toList() ?? [];
+  }
+
+  String getFullTypeName() {
+    return '$typeName${getTypeSuffix()}';
   }
 
   String get typeName {
+    if (_listGenericType != null) {
+      return 'List<${_listGenericType!.typeName}>';
+    }
+
     if (_manualType != null) {
       return _manualType!;
     }
-    if (_autoCorrectedType == null) {
-      _autoCorrectedType = _tryCorrectType();
-    }
+    _autoCorrectedType ??= _tryCorrectType();
     return _autoCorrectedType!;
   }
 
@@ -224,64 +377,94 @@ class JsonToken {
     return defaultValue == null;
   }
 
-  String _getTypeSuffix(bool nullable) {
+  String getTypeSuffix() {
     if (isAlwaysNullable) {
       return '?';
     }
-    return nullable ? '?' : '';
+    return _isNullable ? '?' : '';
+  }
+
+  String get modelName {
+    if (_listGenericType != null) {
+      return _listGenericType!.modelName;
+    }
+    return typeName.camelToSnake();
+  }
+
+  String get fileName {
+    return '$modelName.dart';
+  }
+
+  String get import {
+    return "import '$fileName'";
+  }
+
+  List<JsonToken> get asComplexTypeList {
+    if (!isComplexType) {
+      return const [];
+    }
+    return _keyValues!.whereType<JsonToken>().toList();
+  }
+
+  List<String> _getAllImports() {
+    final temp = <String>[];
+    if (isComplexType) {
+      final tokens = asComplexTypeList;
+      for (var token in tokens) {
+        if (token.isPrimitiveValue || token.typeName == typeName) {
+          continue;
+        }
+        temp.addAll(token._getAllImports());
+        temp.add(token.import);
+      }
+    } else if (isListToken) {
+      final tokens = asList;
+      for (var token in tokens) {
+        if (token.isPrimitiveValue || token.typeName == typeName || token.isListToken) {
+          continue;
+        }
+        temp.addAll(token._getAllImports());
+        temp.add(token.import);
+      }
+    }
+    return temp;
   }
 
   Template? toTemplate({
-    required bool nullable,
     String pathSuffix = '',
     String classSuffix = '',
   }) {
-    if (_value is List) {
-      final list = _value as List;
-      if (list.isNotEmpty && list.first is JsonToken) {
-        return (list.first as JsonToken).toTemplate(
-          nullable: nullable,
-        );
-      }
-    } else if (_value is JsonToken) {
-      return (_value as JsonToken).toTemplate(nullable: nullable);
-    } else if (_value is Map) {
-      final suffix = nullable ? '?' : '';
-      final map = _value as Map;
+    if (isPrimitiveValue) {
+      return null;
+    }
+    bool isNullable = _parentContainer!.isNullable;
+
+    if (isComplexType) {
       String temp = _jsonSerializableTemplate;
       final params = <String>[];
       final fields = <String>[];
-      final imports = <String>[];
+      final imports = HashSet<String>();
       var explicitToJson = true;
-      for (var kv in map.entries) {
-        final keyName = kv.key;
+
+      final tokenList = _keyValues!.cast<JsonToken>();
+      for (var token in tokenList) {
+        final initialKeyName = token._keyName;
         String? typeName;
         String valueView = '';
-        if (kv.value is JsonToken) {
-          final token = kv.value as JsonToken;
 
-          typeName = token.getFullTypeName(nullable);
-          valueView = token.defaultValueView;
-        } else if (kv.value is List) {
-          final list = kv.value as List;
-          if (list.isEmpty) {
-            typeName = 'List<dynamic>$suffix';
-          } else {
-            final token = (list.first as JsonToken);
-            typeName =
-                'List<${token.typeName}>${token._getTypeSuffix(nullable)}';
-            valueView = token.defaultValueView;
-          }
-        }
+        typeName = token.getFullTypeName();
+        valueView = token.getDefaultValueView();
+        // }
+
         if (valueView.isNotEmpty) {
-          params.insert(0, '    this.$keyName$valueView,');
+          params.insert(0, '    this.$initialKeyName$valueView,');
         } else {
-          params.add('    this.$keyName$valueView,');
+          params.add('    this.$initialKeyName$valueView,');
         }
-        if (nullable || typeName!.endsWith('?')) {
-          fields.add('  $typeName $keyName;');
+        if (isNullable || typeName.endsWith('?')) {
+          fields.add('  $typeName $initialKeyName;');
         } else {
-          fields.add('  final $typeName $keyName;');
+          fields.add('  final $typeName $initialKeyName;');
         }
       }
       fields.sort(((a, b) {
@@ -296,11 +479,9 @@ class JsonToken {
         return 1;
       }));
 
-      final modelName = typeName.camelToSnake();
-      final fileName = '$modelName.dart';
-      imports.add("import '$fileName'");
+      imports.addAll(_getAllImports());
 
-      temp = temp.replaceAll('%OTHER_IMPORTS%', imports.join('\n'));
+      temp = temp.replaceAll('%OTHER_IMPORTS%', imports.join(';\n'));
       temp = temp.replaceAll('%PARAMS%', params.join('\n'));
       temp = temp.replaceAll('%FIELDS%', fields.join('\n'));
       temp = temp.replaceAll('%PATH_MODEL_NAME%', modelName);
@@ -315,16 +496,20 @@ class JsonToken {
         content: temp,
       );
     }
+
     return null;
   }
 
   /// Balances or prices most probably must be doubles event they come as
   /// `int` in a json
   bool get _doubleMightBeUseful {
-    if (_keyName == null) {
+    if (_keyName == null || !isPrimitiveValue || !_useDerivedTypePrompts) {
       return false;
     }
     final lowerName = _keyName!.toLowerCase();
+    if (lowerName == 'id' || _keyName!.endsWith('Id') || _keyName!.endsWith('ID')) {
+      return false;
+    }
     return (lowerName.contains('balance') ||
         lowerName.contains('price') ||
         lowerName.contains('fee') ||
@@ -335,7 +520,7 @@ class JsonToken {
   }
 
   bool get _dateTimeMightBeUseful {
-    if (_keyName == null) {
+    if (_keyName == null || _value is! String || !_useDerivedTypePrompts) {
       return false;
     }
     final lowerName = _keyName!.toLowerCase();
@@ -385,12 +570,15 @@ class JsonToken {
   }
 
   bool get isPrimitiveValue {
-    return _value?.isPrimitiveType() == true;
+    return _value?.isPrimitiveType() == true && !isComplexType;
   }
 }
 
 extension ObjectExtension on Object {
   bool isPrimitiveType() {
+    if (this is JsonToken) {
+      return (this as JsonToken)._value?.isPrimitiveType() == true;
+    }
     switch (runtimeType) {
       case int:
       case double:
@@ -402,8 +590,8 @@ extension ObjectExtension on Object {
     return false;
   }
 
-  bool isBuiltInType() {
-    return isPrimitiveType() || this is DateTime;
+  bool get isBuiltInType {
+    return isPrimitiveType() || runtimeType == DateTime;
   }
 }
 
@@ -444,6 +632,20 @@ extension StringExtension on String {
     }
     return this;
   }
+
+  Future copyToClipboard() async {
+    await RichClipboard.setData(RichClipboardData(
+      text: this,
+    ));
+  }
+
+  void showSnackbar(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(this),
+      ),
+    );
+  }
 }
 
 const _jsonSerializableTemplate = r'''
@@ -468,9 +670,9 @@ class %CLASS_MODEL_NAME%%CLASS_SUFFIX% {
       return _$%CLASS_MODEL_NAME%%CLASS_SUFFIX%FromJson(json);
     }
   
-    Map<String, dynamic> toJson() {
-      return _$%CLASS_MODEL_NAME%%CLASS_SUFFIX%ToJson(this);
-    }
+  Map<String, dynamic> toJson() {
+    return _$%CLASS_MODEL_NAME%%CLASS_SUFFIX%ToJson(this);
+  }
 }
 ''';
 

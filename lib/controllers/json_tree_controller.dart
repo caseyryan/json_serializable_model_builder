@@ -6,9 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:highlight/highlight_core.dart' show highlight;
 import 'package:highlight/languages/dart.dart' as dart_lang;
 import 'package:highlight/languages/json.dart' as json_lang;
-import 'package:json_serializable_model_builder/controllers/_json_token_tools.dart';
 import 'package:lite_forms/controllers/lite_form_controller.dart';
 import 'package:lite_state/lite_state.dart';
+
+import 'tokenizer.dart';
 
 part '_example_json.dart';
 
@@ -29,7 +30,6 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   String? _error;
   String? get error => _error;
   Map<String, dynamic> json = {};
-  JsonTokenContainer? _tokenContainer;
   bool _langRegistered = false;
 
   List<JsonSettingType> _selectedTypes = [
@@ -37,12 +37,15 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     JsonSettingType.preferNullable,
   ];
 
+  final List<JsonTokenContainer> _tokenContainers = [];
+  List<JsonTokenContainer> get tokenContainers {
+    return _tokenContainers;
+  }
+
   List<JsonSettingType> get selectedTypes => _selectedTypes;
 
-  bool get mergeSimilarTypes =>
-      _selectedTypes.contains(JsonSettingType.mergeSimilar);
-  bool get preferNullable =>
-      _selectedTypes.contains(JsonSettingType.preferNullable);
+  bool get mergeSimilarTypes => _selectedTypes.contains(JsonSettingType.mergeSimilar);
+  bool get preferNullable => _selectedTypes.contains(JsonSettingType.preferNullable);
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
@@ -51,11 +54,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     rebuild();
   }
 
-  String _rootModelName = 'Root';
-
-  void onModelNameChange(String value) {
-    _rootModelName = value;
-  }
+  void onModelNameChange(String value) {}
 
   bool get showHighlightedText {
     return json.isNotEmpty && _error == null && _langRegistered;
@@ -65,8 +64,12 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     return const JsonEncoder.withIndent(' ').convert(json);
   }
 
-  Future saveModel() async {
-    print('SAVE');
+  List<List<Template>> generateTemplates() {
+    final List<List<Template>> list = [];
+    for (var container in _tokenContainers) {
+      list.add(container.generateTemplates());
+    }
+    return list;
   }
 
   Future rebuildJson() async {
@@ -78,15 +81,18 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   void _buildTreeWrapper() {
-    _tokenContainer = jsonToTokenContainer(
-      json: json,
-      rootTypeName: _rootModelName,
-      mergeSimilarTokens: mergeSimilarTypes,
-    );
-    final templates = _tokenContainer!.toTemplates(
-      nullable: preferNullable,
-    );
-    print(templates);
+    if (_tokenContainers.isEmpty) {
+      final tokenContainer = jsonToTokenContainer(
+        json: json,
+        rootTypeName: 'Root',
+      );
+      tokenContainer.isNullable = preferNullable;
+      _tokenContainers.add(tokenContainer);
+    } else {
+      for (var container in _tokenContainers) {
+        container.isNullable = preferNullable;
+      }
+    }
     rebuild();
   }
 
@@ -108,13 +114,13 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   bool get hasData {
-    return _tokenContainer != null;
+    return _tokenContainers.isNotEmpty;
   }
 
   @override
   void reset() {
     _error = null;
-    _tokenContainer = null;
+    _tokenContainers.clear();
     json.clear();
     rebuild();
   }

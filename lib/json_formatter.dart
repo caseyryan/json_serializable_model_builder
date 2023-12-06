@@ -1,6 +1,7 @@
+// ignore_for_file: avoid_print
+
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class JsonFormatter extends TextInputFormatter {
@@ -14,9 +15,7 @@ class JsonFormatter extends TextInputFormatter {
       final map = jsonDecode(newText);
       newText = const JsonEncoder.withIndent('  ').convert(map);
     } catch (e) {
-      if (kDebugMode) {
-        print(e);
-      }
+      print(e);
     }
     return newValue.copyWith(
       text: newText,

@@ -7,9 +7,11 @@ class JsonHighlighter extends StatelessWidget {
   const JsonHighlighter({
     super.key,
     required this.value,
+    this.language = 'json',
   });
 
   final String value;
+  final String language;
 
   @override
   Widget build(BuildContext context) {
@@ -18,9 +20,8 @@ class JsonHighlighter extends StatelessWidget {
     }
     return SingleChildScrollView(
       child: HighlightView(
-        // textStyle: Theme.of(context).textTheme.bodyMedium,
         value,
-        language: 'json',
+        language: language,
         theme: highlighterThemeLight,
       ),
     );
