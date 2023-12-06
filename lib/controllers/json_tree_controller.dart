@@ -15,7 +15,8 @@ part '_example_json.dart';
 
 enum JsonSettingType {
   preferNullable,
-  mergeSimilar,
+  prependConstWherePossible,
+  useFinalForNonNullable,
 }
 
 JsonTreeController get jsonTreeController {
@@ -33,8 +34,9 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   bool _langRegistered = false;
 
   List<JsonSettingType> _selectedTypes = [
-    JsonSettingType.mergeSimilar,
     JsonSettingType.preferNullable,
+    JsonSettingType.useFinalForNonNullable,
+    JsonSettingType.prependConstWherePossible,
   ];
 
   final List<JsonTokenContainer> _tokenContainers = [];
@@ -44,8 +46,9 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
 
   List<JsonSettingType> get selectedTypes => _selectedTypes;
 
-  bool get mergeSimilarTypes => _selectedTypes.contains(JsonSettingType.mergeSimilar);
   bool get preferNullable => _selectedTypes.contains(JsonSettingType.preferNullable);
+  bool get useFinalForNonNullable => _selectedTypes.contains(JsonSettingType.useFinalForNonNullable);
+  bool get prependConstWherePossible => _selectedTypes.contains(JsonSettingType.prependConstWherePossible);
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
@@ -87,10 +90,14 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
         rootTypeName: 'Root',
       );
       tokenContainer.isNullable = preferNullable;
+      tokenContainer.useFinalForNonNullable = useFinalForNonNullable;
+      tokenContainer.prependConstWherePossible = prependConstWherePossible;
       _tokenContainers.add(tokenContainer);
     } else {
       for (var container in _tokenContainers) {
         container.isNullable = preferNullable;
+        container.useFinalForNonNullable = useFinalForNonNullable;
+        container.prependConstWherePossible = prependConstWherePossible;
       }
     }
     rebuild();

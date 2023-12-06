@@ -52,6 +52,9 @@ class JsonTokenTile extends StatelessWidget {
         bottom: 8.0,
       ),
       child: Material(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0)
+        ),
         elevation: 1.0,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -62,9 +65,9 @@ class JsonTokenTile extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    token.typeName,
+                    token.getClassConstructorName(),
                     style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.tertiary,
                         ),
                   ),
                 ],
@@ -107,7 +110,7 @@ class FieldView extends StatelessWidget {
           TextSpan(
             text: '${token.getFullTypeName()} ',
             style: style.copyWith(
-              color: Theme.of(context).primaryColor,
+              color: Theme.of(context).colorScheme.tertiary,
             ),
           ),
           TextSpan(

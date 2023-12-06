@@ -109,6 +109,8 @@ class JsonTokenContainer {
   }
 
   bool isNullable = false;
+  bool useFinalForNonNullable = false;
+  bool prependConstWherePossible = false;
 
   List<Template> generateTemplates() {
     final list = <Template>[];
@@ -357,8 +359,37 @@ class JsonToken {
     return _keyValues?.whereType<JsonToken>().toList() ?? [];
   }
 
+  bool get _canAddConstToClass {
+    if (_parentContainer!.prependConstWherePossible && !_parentContainer!.isNullable) {
+      if (_keyValues?.isNotEmpty != true || isPrimitiveValue) {
+        return false;
+      }
+      return !fields.any((e) => e.isAlwaysNullable);
+    }
+
+    return false;
+  }
+
   String getFullTypeName() {
-    return '$typeName${getTypeSuffix()}';
+    final suffix = getTypeSuffix();
+    var prefix = '';
+    if (_parentContainer!.useFinalForNonNullable) {
+      if (suffix.isEmpty && !_isNullable) {
+        prefix = 'final ';
+      }
+    } else {
+      if (suffix.isEmpty && !_isNullable) {
+        prefix = 'late ';
+      }
+    }
+    return '$prefix$typeName$suffix';
+  }
+
+  String getClassConstructorName() {
+    if (!_canAddConstToClass) {
+      return typeName;
+    }
+    return 'const $typeName';
   }
 
   String get typeName {
@@ -461,11 +492,7 @@ class JsonToken {
         } else {
           params.add('    this.$initialKeyName$valueView,');
         }
-        if (isNullable || typeName.endsWith('?')) {
-          fields.add('  $typeName $initialKeyName;');
-        } else {
-          fields.add('  final $typeName $initialKeyName;');
-        }
+        fields.add('  $typeName $initialKeyName;');
       }
       fields.sort(((a, b) {
         final aFinal = a.contains('final ');
@@ -480,13 +507,15 @@ class JsonToken {
       }));
 
       imports.addAll(_getAllImports());
+      final importsView = '${imports.join(';\n')};';
 
-      temp = temp.replaceAll('%OTHER_IMPORTS%', imports.join(';\n'));
+      temp = temp.replaceAll('%OTHER_IMPORTS%', importsView);
       temp = temp.replaceAll('%PARAMS%', params.join('\n'));
       temp = temp.replaceAll('%FIELDS%', fields.join('\n'));
       temp = temp.replaceAll('%PATH_MODEL_NAME%', modelName);
       temp = temp.replaceAll('%PATH_SUFFIX%', pathSuffix);
       temp = temp.replaceAll('%CLASS_MODEL_NAME%', typeName);
+      temp = temp.replaceAll('%CLASS_CONSTRUCTOR_NAME%', getClassConstructorName());
       temp = temp.replaceAll('%CLASS_SUFFIX%', classSuffix);
       temp = temp.replaceAll('%EXPLICIT_TO_JSON%', '$explicitToJson');
 
@@ -656,7 +685,7 @@ part '%PATH_MODEL_NAME%%PATH_SUFFIX%.g.dart';
 
 @JsonSerializable(explicitToJson: %EXPLICIT_TO_JSON%)
 class %CLASS_MODEL_NAME%%CLASS_SUFFIX% {
-  %CLASS_MODEL_NAME%%CLASS_SUFFIX%({
+  %CLASS_CONSTRUCTOR_NAME%%CLASS_SUFFIX%({
 %PARAMS%
   });
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:json_serializable_model_builder/controllers/tokenizer.dart';
+import 'package:json_serializable_model_builder/utils/save_as_zip.dart';
 
 import 'highlighter_theme.dart';
 
@@ -34,6 +35,25 @@ class TemplatePreview extends StatelessWidget {
       appBar: AppBar(
         elevation: 0.0,
         scrolledUnderElevation: 0.0,
+        title: const Text(
+          'Preview of the generated Dart classes',
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(
+              right: 16.0,
+            ),
+            child: IconButton.outlined(
+              tooltip: 'Download as ZIP folder',
+              onPressed: ()  {
+                saveAsZip(templates);
+              },
+              icon: const Icon(
+                Icons.download,
+              ),
+            ),
+          ),
+        ],
       ),
       body: CustomScrollView(
         slivers: [

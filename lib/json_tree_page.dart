@@ -71,35 +71,50 @@ class _JsonTreePageState extends State<JsonTreePage> {
                               flex: flex1,
                               child: Row(
                                 children: [
-                                  IconButton.outlined(
-                                    tooltip: 'Regenerate Model',
-                                    onPressed: () async {
-                                      if (kDebugMode ||
-                                          await showCupertinoConfirmation(
-                                            context: context,
-                                            description:
-                                                'Do you want to reset all your changes and rebuild the model from scratch?',
-                                          )) {
-                                        jsonTreeController.rebuildJson();
-                                      }
-                                    },
-                                    icon: const Icon(Icons.refresh),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: 12.0,
+                                    ),
+                                    child: IconButton.outlined(
+                                      tooltip: 'Regenerate Model',
+                                      onPressed: () async {
+                                        if (kDebugMode ||
+                                            await showCupertinoConfirmation(
+                                              context: context,
+                                              description:
+                                                  'Do you want to reset all your changes and rebuild the model from scratch?',
+                                            )) {
+                                          jsonTreeController.rebuildJson();
+                                        }
+                                      },
+                                      icon: const Icon(Icons.refresh),
+                                    ),
                                   ),
                                   if (jsonTreeController.hasData)
-                                    IconButton.outlined(
-                                      tooltip: 'Save Models',
-                                      onPressed: () {
-                                        final templates = jsonTreeController.generateTemplates();
-                                        showTemplatePreview(
-                                          context: context,
-                                          templates: templates,
-                                        );
-                                      },
-                                      icon: const Icon(Icons.save_alt_rounded),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        right: 12.0,
+                                      ),
+                                      child: IconButton.outlined(
+                                        tooltip: 'Save Models',
+                                        onPressed: () {
+                                          final templates = jsonTreeController.generateTemplates();
+                                          showTemplatePreview(
+                                            context: context,
+                                            templates: templates,
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.save_alt_rounded,
+                                        ),
+                                      ),
                                     ),
                                   LiteDropSelector(
                                     dropSelectorActionType: LiteDropSelectorActionType.multiselect,
                                     paddingRight: 8.0,
+                                    settings: LiteDropSelectorSettings(
+                                      minMenuWidth: 320.0,
+                                    ),
                                     selectorViewBuilder: (context, selectedItems) {
                                       return Container(
                                         color: Colors.transparent,
@@ -141,16 +156,26 @@ class _JsonTreePageState extends State<JsonTreePage> {
                                       jsonTreeController.rebuildJson();
                                     },
                                     items: [
-                                      // LiteDropSelectorItem(
-                                      //   title: 'Merge Similar Models',
-                                      //   payload: JsonSettingType.mergeSimilar,
-                                      //   iconBuilder: (context, item, isSelected) {
-                                      //     return Icon(
-                                      //       Icons.merge,
-                                      //       color: Colors.blue,
-                                      //     );
-                                      //   },
-                                      // ),
+                                      LiteDropSelectorItem(
+                                        title: 'Prepend `const` where possible',
+                                        payload: JsonSettingType.prependConstWherePossible,
+                                        iconBuilder: (context, item, isSelected) {
+                                          return Icon(
+                                            Icons.expand_circle_down_rounded,
+                                            color: Colors.orange,
+                                          );
+                                        },
+                                      ),
+                                      LiteDropSelectorItem(
+                                        title: 'Use `final`on none-nullable values',
+                                        payload: JsonSettingType.useFinalForNonNullable,
+                                        iconBuilder: (context, item, isSelected) {
+                                          return Icon(
+                                            Icons.abc_outlined,
+                                            color: Colors.purple,
+                                          );
+                                        },
+                                      ),
                                       LiteDropSelectorItem(
                                         title: 'Prefer Nullable',
                                         payload: JsonSettingType.preferNullable,
@@ -211,5 +236,3 @@ class _JsonTreePageState extends State<JsonTreePage> {
     );
   }
 }
-
-

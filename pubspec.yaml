@@ -33,6 +33,11 @@ dependencies:
   lite_forms: ^0.0.14
   flutter_highlight: ^0.7.0
   rich_clipboard: ^1.0.1
+  path_provider: ^2.1.1
+  archive: ^3.4.9
+  share_plus: ^7.2.1
+  universal_html: ^2.2.4
+
 
 
   # The following adds the Cupertino Icons font to your application.
