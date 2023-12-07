@@ -560,7 +560,10 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
       }));
 
       imports.addAll(_getAllImports());
-      final importsView = '${imports.join(';\n')};';
+      String importsView = imports.join(';\n');
+      if (importsView.isNotEmpty) {
+        importsView = '$importsView;';
+      }
 
       temp = temp.replaceAll('%STATIC_DESERIALIZE%', _getStaticDeserializeContents());
 
