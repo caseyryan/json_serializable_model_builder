@@ -28,6 +28,7 @@ JsonTokenContainer jsonToTokenContainer({
     allTokens: allTokens,
     useDerivedTypePrompts: useDerivedTypePrompts,
   ) as JsonToken;
+  token._isRoot = true;
 
   /// root token must also be in this list
   // allTokens.insert(0, token);
@@ -111,6 +112,7 @@ class JsonTokenContainer {
   bool isNullable = false;
   bool useFinalForNonNullable = false;
   bool prependConstWherePossible = false;
+  bool includeStaticDeserializeMethod = false;
 
   List<Template> generateTemplates() {
     final list = <Template>[];
@@ -213,20 +215,49 @@ class JsonToken {
     r'^(-?)(0|([1-9][0-9]*))(\.[0-9]+)?$',
   );
 
+  bool _isRoot = false;
+  bool get isRoot => _isRoot;
+
   JsonTokenContainer? _parentContainer;
-
-  // @override
-  // bool operator ==(covariant JsonToken other) {
-  //   return other._compareKey == _compareKey;
-  // }
-
-  // @override
-  // int get hashCode {
-  //   return _compareKey.hashCode;
-  // }
 
   /// If type is list, its generic type will be set here
   JsonToken? _listGenericType;
+
+  List<JsonToken> _findTokensOfType(String type) {
+    final temp = <JsonToken>[];
+    if (_typeName == type) {
+      temp.add(this);
+    } else if (_value is JsonToken) {
+      final token = _value as JsonToken;
+      temp.addAll(token._findTokensOfType(type));
+    }
+    if (fields.isNotEmpty == true) {
+      for (var token in fields) {
+        temp.addAll(
+          token._findTokensOfType(type),
+        );
+        if (token._listGenericType != null) {
+          temp.addAll(
+            token._listGenericType!._findTokensOfType(type),
+          );
+        }
+      }
+    }
+    return temp;
+  }
+
+  List<JsonToken> get alterEgos {
+    List<JsonToken> other = [];
+    for (var token in _parentContainer!.allTokens) {
+      other.addAll(token._findTokensOfType(_typeName!));
+    }
+    other = other
+        .where(
+          (element) => element != this,
+        )
+        .toList();
+    return other;
+  }
 
   JsonToken();
 
@@ -249,8 +280,23 @@ class JsonToken {
   String? _manualType;
   Object? _manualDefaultValue;
 
+  bool isEditing = false;
+
   bool get isComplexType {
     return _keyValues != null;
+  }
+
+  void saveName() {
+    isEditing = false;
+    if (_manualType?.isEmpty == true || _manualType?.startsWith(RegExp(r'[0-9]+')) == true) {
+      _manualType = null;
+      return;
+    }
+
+    _manualType = _manualType!.replaceAll(RegExp(r'[,.^;*!%# ]+'), '');
+    for (var token in alterEgos) {
+      token.setTypeName(_manualType!);
+    }
   }
 
   factory JsonToken.mapped() {
@@ -309,9 +355,6 @@ class JsonToken {
     // @JsonKey(name: 'user_msg')
     return buffer.toString();
   }
-
-  bool _isTypeSetManually = false;
-  bool get isTypeSetManually => _isTypeSetManually;
 
   void setTypeName(String value) {
     _manualType = value;
@@ -397,7 +440,7 @@ class JsonToken {
       return 'List<${_listGenericType!.typeName}>';
     }
 
-    if (_manualType != null) {
+    if (_manualType != null && !isEditing) {
       return _manualType!;
     }
     _autoCorrectedType ??= _tryCorrectType();
@@ -461,6 +504,17 @@ class JsonToken {
     return temp;
   }
 
+  String _getStaticDeserializeContents() {
+    if (!_parentContainer!.includeStaticDeserializeMethod) {
+      return '';
+    }
+    return '''
+static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
+    return %CLASS_MODEL_NAME%%CLASS_SUFFIX%.fromJson(json);
+  }
+''';
+  }
+
   Template? toTemplate({
     String pathSuffix = '',
     String classSuffix = '',
@@ -468,7 +522,6 @@ class JsonToken {
     if (isPrimitiveValue) {
       return null;
     }
-    bool isNullable = _parentContainer!.isNullable;
 
     if (isComplexType) {
       String temp = _jsonSerializableTemplate;
@@ -509,6 +562,8 @@ class JsonToken {
       imports.addAll(_getAllImports());
       final importsView = '${imports.join(';\n')};';
 
+      temp = temp.replaceAll('%STATIC_DESERIALIZE%', _getStaticDeserializeContents());
+
       temp = temp.replaceAll('%OTHER_IMPORTS%', importsView);
       temp = temp.replaceAll('%PARAMS%', params.join('\n'));
       temp = temp.replaceAll('%FIELDS%', fields.join('\n'));
@@ -523,6 +578,7 @@ class JsonToken {
         fileName: fileName,
         typeName: typeName,
         content: temp,
+        isRoot: isRoot,
       );
     }
 
@@ -625,13 +681,15 @@ extension ObjectExtension on Object {
 }
 
 class Template {
-  String fileName;
-  String typeName;
-  String content;
+  final String fileName;
+  final String typeName;
+  final String content;
+  final bool isRoot;
   Template({
     required this.fileName,
     required this.typeName,
     required this.content,
+    required this.isRoot,
   });
 
   @override
@@ -691,10 +749,7 @@ class %CLASS_MODEL_NAME%%CLASS_SUFFIX% {
 
 %FIELDS%
 
-  static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
-    return %CLASS_MODEL_NAME%%CLASS_SUFFIX%.fromJson(json);
-  }
-
+  %STATIC_DESERIALIZE%
   factory %CLASS_MODEL_NAME%%CLASS_SUFFIX%.fromJson(Map<String, dynamic> json) {
       return _$%CLASS_MODEL_NAME%%CLASS_SUFFIX%FromJson(json);
     }

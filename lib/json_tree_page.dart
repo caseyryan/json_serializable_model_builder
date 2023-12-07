@@ -114,6 +114,7 @@ class _JsonTreePageState extends State<JsonTreePage> {
                                     paddingRight: 8.0,
                                     settings: LiteDropSelectorSettings(
                                       minMenuWidth: 320.0,
+                                      buttonHeight: 50.0
                                     ),
                                     selectorViewBuilder: (context, selectedItems) {
                                       return Container(
@@ -157,7 +158,7 @@ class _JsonTreePageState extends State<JsonTreePage> {
                                     },
                                     items: [
                                       LiteDropSelectorItem(
-                                        title: 'Prepend `const` where possible',
+                                        title: 'Prefer const constructors',
                                         payload: JsonSettingType.prependConstWherePossible,
                                         iconBuilder: (context, item, isSelected) {
                                           return Icon(
@@ -167,11 +168,21 @@ class _JsonTreePageState extends State<JsonTreePage> {
                                         },
                                       ),
                                       LiteDropSelectorItem(
-                                        title: 'Use `final`on none-nullable values',
+                                        title: 'Use final on non-nullable',
                                         payload: JsonSettingType.useFinalForNonNullable,
                                         iconBuilder: (context, item, isSelected) {
                                           return Icon(
                                             Icons.abc_outlined,
+                                            color: Colors.purple,
+                                          );
+                                        },
+                                      ),
+                                      LiteDropSelectorItem(
+                                        title: 'Include static deserialize()',
+                                        payload: JsonSettingType.includeStaticDeserializeMethod,
+                                        iconBuilder: (context, item, isSelected) {
+                                          return Icon(
+                                            Icons.undo_sharp,
                                             color: Colors.purple,
                                           );
                                         },

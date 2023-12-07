@@ -16,6 +16,7 @@ part '_example_json.dart';
 enum JsonSettingType {
   preferNullable,
   prependConstWherePossible,
+  includeStaticDeserializeMethod,
   useFinalForNonNullable,
 }
 
@@ -37,6 +38,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     JsonSettingType.preferNullable,
     JsonSettingType.useFinalForNonNullable,
     JsonSettingType.prependConstWherePossible,
+    JsonSettingType.includeStaticDeserializeMethod,
   ];
 
   final List<JsonTokenContainer> _tokenContainers = [];
@@ -49,6 +51,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   bool get preferNullable => _selectedTypes.contains(JsonSettingType.preferNullable);
   bool get useFinalForNonNullable => _selectedTypes.contains(JsonSettingType.useFinalForNonNullable);
   bool get prependConstWherePossible => _selectedTypes.contains(JsonSettingType.prependConstWherePossible);
+  bool get includeStaticDeserializeMethod => _selectedTypes.contains(JsonSettingType.includeStaticDeserializeMethod);
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
@@ -92,12 +95,14 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
       tokenContainer.isNullable = preferNullable;
       tokenContainer.useFinalForNonNullable = useFinalForNonNullable;
       tokenContainer.prependConstWherePossible = prependConstWherePossible;
+      tokenContainer.includeStaticDeserializeMethod = includeStaticDeserializeMethod;
       _tokenContainers.add(tokenContainer);
     } else {
       for (var container in _tokenContainers) {
         container.isNullable = preferNullable;
         container.useFinalForNonNullable = useFinalForNonNullable;
         container.prependConstWherePossible = prependConstWherePossible;
+        container.includeStaticDeserializeMethod = includeStaticDeserializeMethod;
       }
     }
     rebuild();
@@ -117,6 +122,22 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
       json = {};
       _error = 'Invalid JSON';
     }
+    rebuild();
+  }
+
+  void onTokenNameChange({
+    required String value,
+    required JsonToken token,
+  }) {
+    token.setTypeName(value);
+    for (var token in token.alterEgos) {
+      token.setTypeName(value);
+    }
+    rebuild();
+  }
+
+  void saveTokenName(JsonToken token) {
+    token.saveName();
     rebuild();
   }
 

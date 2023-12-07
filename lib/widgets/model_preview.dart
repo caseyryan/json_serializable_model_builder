@@ -35,25 +35,34 @@ class TemplatePreview extends StatelessWidget {
       appBar: AppBar(
         elevation: 0.0,
         scrolledUnderElevation: 0.0,
-        title: const Text(
-          'Preview of the generated Dart classes',
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(
-              right: 16.0,
-            ),
-            child: IconButton.outlined(
-              tooltip: 'Download as ZIP folder',
-              onPressed: ()  {
-                saveAsZip(templates);
-              },
-              icon: const Icon(
-                Icons.download,
+        title: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(
+                right: 16.0,
+              ),
+              child: Builder(
+                builder: (c) {
+                  return IconButton.outlined(
+                    tooltip: 'Download all as ZIP archive',
+                    onPressed: () {
+                      saveAsZip(
+                        templates: templates,
+                        renderBox: c.findRenderObject() as RenderBox,
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.save_alt_rounded,
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-        ],
+            const Text(
+              'Preview of the generated Dart classes',
+            ),
+          ],
+        ),
       ),
       body: CustomScrollView(
         slivers: [
