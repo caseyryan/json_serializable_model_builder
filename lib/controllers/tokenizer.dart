@@ -1,5 +1,6 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:json_serializable_model_builder/extensions/string_extensions.dart';
 import 'package:lite_forms/utils/exports.dart';
@@ -290,12 +291,11 @@ class JsonToken {
     isEditing = false;
     if (_manualType?.isEmpty == true || _manualType?.startsWith(RegExp(r'[0-9]+')) == true) {
       _manualType = null;
-      return;
     }
 
-    _manualType = _manualType!.replaceAll(RegExp(r'[,.^;*!%# ]+'), '');
+    _manualType = _manualType?.replaceAll(RegExp(r'[,.^;*!%# ]+'), '');
     for (var token in alterEgos) {
-      token.setTypeName(_manualType!);
+      token.setTypeName(_manualType);
     }
   }
 
@@ -356,7 +356,7 @@ class JsonToken {
     return buffer.toString();
   }
 
-  void setTypeName(String value) {
+  void setTypeName(String? value) {
     _manualType = value;
   }
 
@@ -642,9 +642,9 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
         return 'bool';
       }
     }
-    if (_value is double || _doubleMightBeUseful) {
+    if (_isDouble(_value) || _doubleMightBeUseful) {
       return 'double';
-    } else if (_value is int) {
+    } else if (_isInt(_value)) {
       return 'int';
     }
 
@@ -656,6 +656,32 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
 
   bool get isPrimitiveValue {
     return _value?.isPrimitiveType() == true && !isComplexType;
+  }
+
+  bool _isDouble(Object? value) {
+    if (kIsWeb) {
+      /// on web a value is always double
+      if (value is double) {
+        if (!value.toString().contains('.')) {
+          return false;
+        }
+        return true;
+      }
+    }
+    return _value is double;
+  }
+
+  bool _isInt(Object? value) {
+    if (kIsWeb) {
+      /// on web a value is always double
+      if (value is num) {
+        if (!value.toString().contains('.')) {
+          return true;
+        }
+        return false;
+      }
+    }
+    return _value is int;
   }
 }
 
