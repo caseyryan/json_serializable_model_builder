@@ -324,24 +324,27 @@ class JsonToken {
   String? _manualType;
   Object? _manualDefaultValue;
 
-  // bool isEditing = false;
-
   bool get isComplexType {
     return _keyValues != null;
   }
 
   void saveName() {
-    // isEditing = false;
     if (_manualType?.isEmpty == true || _manualType?.startsWith(RegExp(r'[0-9]+')) == true) {
       _manualType = null;
     }
 
     _manualType = _manualType?.replaceAll(RegExp(r'[,.^;*!%# ]+'), '');
     if (_typeName?.isNotEmpty == true) {
-      typeNameCache[_typeName!] = _manualType;
+      if (!isPrimitiveType()) {
+        typeNameCache[_typeName!] = _manualType;
+      } else {
+        typeNameCache['$_typeName$keyName'] = _manualType;
+      }
     }
-    for (var token in alterEgos) {
-      token.setTypeName(_manualType);
+    if (!isPrimitiveType()) {
+      for (var token in alterEgos) {
+        token.setTypeName(_manualType);
+      }
     }
   }
 
@@ -478,7 +481,11 @@ class JsonToken {
     if (_listGenericType != null) {
       return 'List<${_listGenericType!.typeName}>';
     }
-    _manualType ??= typeNameCache[_typeName];
+    if (!isPrimitiveType()) {
+      _manualType ??= typeNameCache[_typeName];
+    } else {
+      _manualType ??= typeNameCache['$_typeName$keyName'];
+    }
 
     if (_manualType != null) {
       return _manualType!;

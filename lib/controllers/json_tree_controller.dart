@@ -173,6 +173,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
         token.setTypeName(value);
       }
     }
+    token.saveName();
     rebuild();
   }
 
