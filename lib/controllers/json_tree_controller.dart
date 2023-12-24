@@ -1,4 +1,4 @@
-// ignore_for_file: depend_on_referenced_packages, unnecessary_getters_setters
+// ignore_for_file: depend_on_referenced_packages, unnecessary_getters_setters, avoid_print
 
 import 'dart:convert';
 
@@ -18,6 +18,7 @@ enum JsonSettingType {
   prependConstWherePossible,
   includeStaticDeserializeMethod,
   useFinalForNonNullable,
+  alwaysPreferCamelCase,
 }
 
 JsonTreeController get jsonTreeController {
@@ -33,12 +34,15 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   String? get error => _error;
   Map<String, dynamic> json = {};
   bool _langRegistered = false;
+  int _numLines = 0;
+  int get numLines => _numLines;
 
   List<JsonSettingType> _selectedTypes = [
     JsonSettingType.preferNullable,
     JsonSettingType.useFinalForNonNullable,
     JsonSettingType.prependConstWherePossible,
     JsonSettingType.includeStaticDeserializeMethod,
+    JsonSettingType.alwaysPreferCamelCase,
   ];
 
   final List<JsonTokenContainer> _tokenContainers = [];
@@ -47,11 +51,14 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   }
 
   List<JsonSettingType> get selectedTypes => _selectedTypes;
+  bool _highlightJson = false;
+  bool get highlightJson => _highlightJson;
 
   bool get preferNullable => _selectedTypes.contains(JsonSettingType.preferNullable);
   bool get useFinalForNonNullable => _selectedTypes.contains(JsonSettingType.useFinalForNonNullable);
   bool get prependConstWherePossible => _selectedTypes.contains(JsonSettingType.prependConstWherePossible);
   bool get includeStaticDeserializeMethod => _selectedTypes.contains(JsonSettingType.includeStaticDeserializeMethod);
+  bool get alwaysPreferCamelCase => _selectedTypes.contains(JsonSettingType.alwaysPreferCamelCase);
 
   void _registerLanguages() {
     highlight.registerLanguage('json', json_lang.json);
@@ -63,11 +70,16 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
   void onModelNameChange(String value) {}
 
   bool get showHighlightedText {
-    return json.isNotEmpty && _error == null && _langRegistered;
+    return _highlightJson && _error == null && _langRegistered;
+  }
+
+  void toggleHighlight() {
+    _highlightJson = !_highlightJson;
+    rebuild();
   }
 
   String get formattedJson {
-    return const JsonEncoder.withIndent(' ').convert(json);
+    return const JsonEncoder.withIndent('   ').convert(json);
   }
 
   List<List<Template>> generateTemplates() {
@@ -76,6 +88,26 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
       list.add(container.generateTemplates());
     }
     return list;
+  }
+
+  bool get hasPastedJson {
+    return jsonController.text.isNotEmpty;
+  }
+
+  void onRegenerateModelsPressed() {
+    try {
+      _error = null;
+      final tempJson = jsonDecode(jsonController.text);
+      json = tempJson;
+      _tokenContainers.clear();
+      rebuildJson();
+    } on FormatException catch (e) {
+      _error = e.toString().trim();
+      rebuild();
+    } catch (e) {
+      _error = 'Invalid JSON';
+      print(e);
+    }
   }
 
   Future rebuildJson() async {
@@ -96,6 +128,7 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
       tokenContainer.useFinalForNonNullable = useFinalForNonNullable;
       tokenContainer.prependConstWherePossible = prependConstWherePossible;
       tokenContainer.includeStaticDeserializeMethod = includeStaticDeserializeMethod;
+      tokenContainer.alwaysPreferCamelCase = alwaysPreferCamelCase;
       _tokenContainers.add(tokenContainer);
     } else {
       for (var container in _tokenContainers) {
@@ -103,23 +136,28 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
         container.useFinalForNonNullable = useFinalForNonNullable;
         container.prependConstWherePossible = prependConstWherePossible;
         container.includeStaticDeserializeMethod = includeStaticDeserializeMethod;
+        container.alwaysPreferCamelCase = alwaysPreferCamelCase;
       }
     }
+    _numLines = jsonController.text.formatJson().numLines;
+    debugPrint('NUM LINES: $numLines');
     rebuild();
   }
 
   void enterExample() {
     reset();
-    onJsonEnter(_exampleJson);
+    jsonController.text = _exampleJson.formatJson();
+    onChange(_exampleJson);
   }
 
-  Future onJsonEnter(String value) async {
+  Future onChange(String value) async {
     try {
       _error = null;
       json = jsonDecode(value);
       _buildTreeWrapper();
+    } on FormatException catch (e) {
+      _error = e.toString().trim();
     } catch (e) {
-      json = {};
       _error = 'Invalid JSON';
     }
     rebuild();
@@ -130,8 +168,10 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     required JsonToken token,
   }) {
     token.setTypeName(value);
-    for (var token in token.alterEgos) {
-      token.setTypeName(value);
+    if (!token.isPrimitiveType()) {
+      for (var token in token.alterEgos) {
+        token.setTypeName(value);
+      }
     }
     rebuild();
   }
@@ -147,9 +187,12 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
 
   @override
   void reset() {
+    typeNameCache.clear();
+    _numLines = 1;
     _error = null;
     _tokenContainers.clear();
     json.clear();
+    jsonController.clear();
     rebuild();
   }
 

@@ -26,7 +26,7 @@ Future saveAsZip({
         template.content,
       );
       if (template.isRoot && archiveName == null) {
-        archiveName = '${template.typeName}.zip';
+        archiveName = template.archiveName;
       }
       final archiveInput = ArchiveFile.noCompress(
         fileName,

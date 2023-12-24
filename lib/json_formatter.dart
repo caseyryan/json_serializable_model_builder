@@ -1,8 +1,7 @@
 // ignore_for_file: avoid_print
 
-import 'dart:convert';
-
 import 'package:flutter/services.dart';
+import 'package:json_serializable_model_builder/controllers/tokenizer.dart';
 
 class JsonFormatter extends TextInputFormatter {
   @override
@@ -12,8 +11,7 @@ class JsonFormatter extends TextInputFormatter {
   ) {
     String newText = newValue.text;
     try {
-      final map = jsonDecode(newText);
-      newText = const JsonEncoder.withIndent('  ').convert(map);
+      newText = newText.formatJson();
     } catch (e) {
       print(e);
     }

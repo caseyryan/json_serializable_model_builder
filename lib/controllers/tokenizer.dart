@@ -1,10 +1,20 @@
+// ignore_for_file: empty_catches, use_build_context_synchronously
+
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:json_serializable_model_builder/extensions/string_extensions.dart';
+import 'package:json_serializable_model_builder/utils/show_cupertino_confirmation.dart';
+import 'package:lite_forms/controllers/lite_form_controller.dart';
 import 'package:lite_forms/utils/exports.dart';
 import 'package:rich_clipboard/rich_clipboard.dart';
+
+import 'json_tree_controller.dart';
+
+/// It has exists until you clear a JSON
+final Map<String, String?> typeNameCache = {};
 
 /// [rootTypeName]
 /// [mergeSimilarTokens] the tool will try to find
@@ -114,6 +124,7 @@ class JsonTokenContainer {
   bool useFinalForNonNullable = false;
   bool prependConstWherePossible = false;
   bool includeStaticDeserializeMethod = false;
+  bool alwaysPreferCamelCase = false;
 
   List<Template> generateTemplates() {
     final list = <Template>[];
@@ -247,6 +258,26 @@ class JsonToken {
     return temp;
   }
 
+  Future onChangeNamePressed(BuildContext context) async {
+    showCustomDialog(
+      title: 'Change Type Name',
+      cancelText: 'Cancel',
+      confirmText: 'Save',
+      context: context,
+      confirmCondition: () async {
+        final value = await form('alert.input').field.get(true);
+        jsonTreeController.onTokenNameChange(
+          value: value,
+          token: this,
+        );
+        Navigator.of(context).pop();
+      },
+      content: AlertField(
+        initialValue: getClassConstructorName(),
+      ),
+    );
+  }
+
   List<JsonToken> get alterEgos {
     List<JsonToken> other = [];
     for (var token in _parentContainer!.allTokens) {
@@ -272,7 +303,19 @@ class JsonToken {
   String? _typeName;
   String? _keyName;
   String? get keyName {
+    if (_parentContainer?.alwaysPreferCamelCase == true && _keyName?.isSnakeCase == true) {
+      return _keyName!.snakeToCamel();
+    }
     return _keyName;
+  }
+
+  String getJsonKey() {
+    if (_parentContainer?.alwaysPreferCamelCase == true) {
+      if (_keyName?.isSnakeCase == true) {
+        return "@JsonKey(name: '$_keyName')";
+      }
+    }
+    return '';
   }
 
   Object? _value;
@@ -281,19 +324,22 @@ class JsonToken {
   String? _manualType;
   Object? _manualDefaultValue;
 
-  bool isEditing = false;
+  // bool isEditing = false;
 
   bool get isComplexType {
     return _keyValues != null;
   }
 
   void saveName() {
-    isEditing = false;
+    // isEditing = false;
     if (_manualType?.isEmpty == true || _manualType?.startsWith(RegExp(r'[0-9]+')) == true) {
       _manualType = null;
     }
 
     _manualType = _manualType?.replaceAll(RegExp(r'[,.^;*!%# ]+'), '');
+    if (_typeName?.isNotEmpty == true) {
+      typeNameCache[_typeName!] = _manualType;
+    }
     for (var token in alterEgos) {
       token.setTypeName(_manualType);
     }
@@ -347,13 +393,6 @@ class JsonToken {
       return (_value as JsonToken)._compareKey;
     }
     return __compareKey!;
-  }
-
-  String _getJsonKeyAnnotation() {
-    final buffer = StringBuffer();
-
-    // @JsonKey(name: 'user_msg')
-    return buffer.toString();
   }
 
   void setTypeName(String? value) {
@@ -439,8 +478,9 @@ class JsonToken {
     if (_listGenericType != null) {
       return 'List<${_listGenericType!.typeName}>';
     }
+    _manualType ??= typeNameCache[_typeName];
 
-    if (_manualType != null && !isEditing) {
+    if (_manualType != null) {
       return _manualType!;
     }
     _autoCorrectedType ??= _tryCorrectType();
@@ -467,6 +507,10 @@ class JsonToken {
 
   String get fileName {
     return '$modelName.dart';
+  }
+
+  String get archiveName {
+    return '$modelName.zip';
   }
 
   String get import {
@@ -532,7 +576,7 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
 
       final tokenList = _keyValues!.cast<JsonToken>();
       for (var token in tokenList) {
-        final initialKeyName = token._keyName;
+        final initialKeyName = token.keyName;
         String? typeName;
         String valueView = '';
 
@@ -545,19 +589,28 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
         } else {
           params.add('    this.$initialKeyName$valueView,');
         }
-        fields.add('  $typeName $initialKeyName;');
+        final fieldBuffer = StringBuffer();
+        final jsonKeyAnnotation = token.getJsonKey();
+        if (jsonKeyAnnotation.isNotEmpty) {
+          fieldBuffer.writeln('  $jsonKeyAnnotation');
+        }
+        fieldBuffer.write('  $typeName $initialKeyName;');
+
+        fields.add(fieldBuffer.toString());
       }
-      fields.sort(((a, b) {
-        final aFinal = a.contains('final ');
-        final bFinal = b.contains('final ');
-        if (aFinal && bFinal) {
-          return 0;
-        }
-        if (aFinal) {
-          return -1;
-        }
-        return 1;
-      }));
+      if (!_parentContainer!.alwaysPreferCamelCase) {
+        fields.sort(((a, b) {
+          final aFinal = a.contains('final ');
+          final bFinal = b.contains('final ');
+          if (aFinal && bFinal) {
+            return 0;
+          }
+          if (aFinal) {
+            return -1;
+          }
+          return 1;
+        }));
+      }
 
       imports.addAll(_getAllImports());
       String importsView = imports.join(';\n');
@@ -582,6 +635,7 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
         typeName: typeName,
         content: temp,
         isRoot: isRoot,
+        archiveName: archiveName,
       );
     }
 
@@ -711,11 +765,13 @@ extension ObjectExtension on Object {
 
 class Template {
   final String fileName;
+  final String archiveName;
   final String typeName;
   final String content;
   final bool isRoot;
   Template({
     required this.fileName,
+    required this.archiveName,
     required this.typeName,
     required this.content,
     required this.isRoot,
@@ -749,6 +805,18 @@ extension StringExtension on String {
     return this;
   }
 
+  int get numLines {
+    return RegExp(r'\n+').allMatches(this).length + 1;
+  }
+
+  String formatJson() {
+    try {
+      final map = jsonDecode(this);
+      return const JsonEncoder.withIndent('  ').convert(map);
+    } catch (e) {}
+    return this;
+  }
+
   Future copyToClipboard() async {
     await RichClipboard.setData(RichClipboardData(
       text: this,
@@ -765,6 +833,7 @@ extension StringExtension on String {
 }
 
 const _jsonSerializableTemplate = r'''
+// ignore_for_file: depend_on_referenced_packages
 import 'package:json_annotation/json_annotation.dart';
 %OTHER_IMPORTS%
 

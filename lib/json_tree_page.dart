@@ -1,6 +1,5 @@
 // ignore_for_file: prefer_const_literals_to_create_immutables, prefer_const_constructors
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:json_serializable_model_builder/controllers/json_tree_controller.dart';
 import 'package:json_serializable_model_builder/dialogs/show_cupertino_confirmation.dart';
@@ -48,7 +47,8 @@ class _JsonTreePageState extends State<JsonTreePage> {
         return Unfocuser(
           child: Scaffold(
             appBar: AppBar(
-              backgroundColor: Theme.of(context).colorScheme.primary,
+              elevation: 0.0,
+              // backgroundColor: Theme.of(context).colorScheme.primary,
               title: const Text(
                 'Build `json_serializable` Model',
                 style: TextStyle(color: Colors.white),
@@ -71,25 +71,25 @@ class _JsonTreePageState extends State<JsonTreePage> {
                               flex: flex1,
                               child: Row(
                                 children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: 12.0,
-                                    ),
-                                    child: IconButton.outlined(
-                                      tooltip: 'Regenerate Model',
-                                      onPressed: () async {
-                                        if (kDebugMode ||
-                                            await showCupertinoConfirmation(
-                                              context: context,
-                                              description:
-                                                  'Do you want to reset all your changes and rebuild the model from scratch?',
-                                            )) {
-                                          jsonTreeController.rebuildJson();
-                                        }
-                                      },
-                                      icon: const Icon(Icons.refresh),
-                                    ),
-                                  ),
+                                  // Padding(
+                                  //   padding: const EdgeInsets.only(
+                                  //     right: 12.0,
+                                  //   ),
+                                  //   child: IconButton.outlined(
+                                  //     tooltip: 'Regenerate Models',
+                                  //     onPressed: () async {
+                                  //       if (kDebugMode ||
+                                  //           await showCupertinoConfirmation(
+                                  //             context: context,
+                                  //             description:
+                                  //                 'Do you want to reset all your changes and rebuild the model from scratch?',
+                                  //           )) {
+                                  //         jsonTreeController.onRegenerateModelsPressed();
+                                  //       }
+                                  //     },
+                                  //     icon: const Icon(Icons.refresh),
+                                  //   ),
+                                  // ),
                                   if (jsonTreeController.hasData)
                                     Padding(
                                       padding: const EdgeInsets.only(
@@ -113,10 +113,14 @@ class _JsonTreePageState extends State<JsonTreePage> {
                                     dropSelectorActionType: LiteDropSelectorActionType.multiselect,
                                     paddingRight: 8.0,
                                     settings: LiteDropSelectorSettings(
-                                      minMenuWidth: 320.0,
-                                      buttonHeight: 50.0
+                                      maxMenuWidth: 320.0,
+                                      buttonHeight: 50.0,
                                     ),
-                                    selectorViewBuilder: (context, selectedItems) {
+                                    selectorViewBuilder: (
+                                      context,
+                                      selectedItems,
+                                      error,
+                                    ) {
                                       return Container(
                                         color: Colors.transparent,
                                         child: IgnorePointer(
@@ -160,42 +164,22 @@ class _JsonTreePageState extends State<JsonTreePage> {
                                       LiteDropSelectorItem(
                                         title: 'Prefer const constructors',
                                         payload: JsonSettingType.prependConstWherePossible,
-                                        iconBuilder: (context, item, isSelected) {
-                                          return Icon(
-                                            Icons.expand_circle_down_rounded,
-                                            color: Colors.orange,
-                                          );
-                                        },
                                       ),
                                       LiteDropSelectorItem(
                                         title: 'Use final on non-nullable',
                                         payload: JsonSettingType.useFinalForNonNullable,
-                                        iconBuilder: (context, item, isSelected) {
-                                          return Icon(
-                                            Icons.abc_outlined,
-                                            color: Colors.purple,
-                                          );
-                                        },
                                       ),
                                       LiteDropSelectorItem(
                                         title: 'Include static deserialize()',
                                         payload: JsonSettingType.includeStaticDeserializeMethod,
-                                        iconBuilder: (context, item, isSelected) {
-                                          return Icon(
-                                            Icons.undo_sharp,
-                                            color: Colors.purple,
-                                          );
-                                        },
                                       ),
                                       LiteDropSelectorItem(
                                         title: 'Prefer Nullable',
                                         payload: JsonSettingType.preferNullable,
-                                        iconBuilder: (context, item, isSelected) {
-                                          return Icon(
-                                            Icons.check_circle_outline,
-                                            color: Colors.green,
-                                          );
-                                        },
+                                      ),
+                                      LiteDropSelectorItem(
+                                        title: 'Always Use CamelCase',
+                                        payload: JsonSettingType.alwaysPreferCamelCase,
                                       ),
                                     ],
                                   ),

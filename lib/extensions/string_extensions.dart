@@ -9,6 +9,10 @@ extension JsonStringExtensions on String {
     return this[length - 1];
   }
 
+  bool get isSnakeCase {
+    return contains('_');
+  }
+
   String camelToSnake() {
     if (isEmpty) return this;
     final presplit = split('');

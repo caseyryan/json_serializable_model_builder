@@ -15,7 +15,6 @@ class ObjectTree extends StatelessWidget {
         ],
       );
     }
-
     return CustomScrollView(
       slivers: [
         ...jsonTreeController.tokenContainers.map(

@@ -1,5 +1,5 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:json_serializable_model_builder/controllers/json_tree_controller.dart';
 import 'package:json_serializable_model_builder/controllers/tokenizer.dart';
 
 class TokenContainerList extends StatelessWidget {
@@ -42,46 +42,10 @@ class JsonTokenTile extends StatefulWidget {
 }
 
 class _JsonTokenTileState extends State<JsonTokenTile> {
-  String _name = '';
-
   Widget _buildTypeNameView() {
-    if (widget.token.isEditing) {
-      return SizedBox(
-        height: 40.0,
-        child: Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                initialValue: _name,
-                onChanged: (value) {
-                  jsonTreeController.onTokenNameChange(
-                    value: value,
-                    token: widget.token,
-                  );
-                },
-              ),
-            ),
-            OutlinedButton(
-              onPressed: () {
-                setState(() {
-                  jsonTreeController.saveTokenName(
-                    widget.token,
-                  );
-                });
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      );
-    }
-
     return InkWell(
       onTap: () {
-        setState(() {
-          _name = widget.token.getClassConstructorName();
-          widget.token.isEditing = !widget.token.isEditing;
-        });
+        widget.token.onChangeNamePressed(context);
       },
       child: Text(
         widget.token.getClassConstructorName(),
@@ -108,9 +72,6 @@ class _JsonTokenTileState extends State<JsonTokenTile> {
         bottom: 8.0,
       ),
       child: Material(
-        // shape: RoundedRectangleBorder(
-        //   borderRadius: BorderRadius.circular(8.0)
-        // ),
         elevation: 1.0,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -149,17 +110,19 @@ class FieldView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyMedium!;
-
     return RichText(
       text: TextSpan(
         style: style,
         children: [
           TextSpan(
-            text: '${token.getFullTypeName()} ',
-            style: style.copyWith(
-              color: Theme.of(context).colorScheme.tertiary,
-            ),
-          ),
+              text: '${token.getFullTypeName()} ',
+              style: style.copyWith(
+                color: Theme.of(context).colorScheme.tertiary,
+              ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () {
+                  token.onChangeNamePressed(context);
+                }),
           TextSpan(
             text: token.keyName,
           ),
