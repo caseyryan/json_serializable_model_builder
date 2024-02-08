@@ -1,0 +1,11 @@
+framework module rich_clipboard_ios {
+  umbrella header "rich_clipboard_ios-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module rich_clipboard_ios.Swift {
+  header "rich_clipboard_ios-Swift.h"
+  requires objc
+}
