@@ -162,6 +162,9 @@ Object? _tokenize({
     allTokens.add(token);
     for (var kv in input.entries) {
       final keyName = kv.key;
+      if (kv.value == null || (kv.value is List && kv.value.isEmpty) || (kv.value is Map && kv.value.isEmpty)) {
+        continue;
+      }
       final innerTypeName = kv.toTypeName();
       final value = _tokenize(
         typeName: innerTypeName,
@@ -273,7 +276,7 @@ class JsonToken {
         Navigator.of(context).pop();
       },
       content: AlertField(
-        initialValue: getClassConstructorName(),
+        initialValue: typeName,
       ),
     );
   }
@@ -281,7 +284,9 @@ class JsonToken {
   List<JsonToken> get alterEgos {
     List<JsonToken> other = [];
     for (var token in _parentContainer!.allTokens) {
-      other.addAll(token._findTokensOfType(_typeName!));
+      if (_typeName != null) {
+        other.addAll(token._findTokensOfType(_typeName!));
+      }
     }
     other = other
         .where(
@@ -395,10 +400,21 @@ class JsonToken {
     } else if (_value is JsonToken) {
       return (_value as JsonToken)._compareKey;
     }
+    // if (__compareKey == null) {
+    //   print(_value);
+    // }
     return __compareKey!;
   }
 
   void setTypeName(String? value) {
+    if (_listGenericType is JsonToken) {
+      if (value?.contains('<') == true && value?.contains('>') == true) {
+        /// случай переименования типа в дженерик листе
+        final generic = value!.extractListType();
+        _listGenericType?.setTypeName(generic);
+      }
+      return;
+    }
     _manualType = value;
   }
 
@@ -800,6 +816,11 @@ extension MapEntryExtension on MapEntry {
     if ((value as Object).isPrimitiveType()) {
       return value.runtimeType.toString();
     }
+    if (value is List && value.isNotEmpty) {
+      if ((value.first as Object).isPrimitiveType()) {
+        return (value.first as Object).runtimeType.toString();
+      }
+    }
     return key.toString().toSingular().firstToUpperCase();
   }
 }
@@ -808,6 +829,17 @@ extension StringExtension on String {
   String toSingular() {
     if (endsWith('s') || endsWith('S')) {
       return substring(0, length - 1);
+    }
+    return this;
+  }
+
+  String extractListType() {
+    if (contains('List<') && contains('>')) {
+      final match = RegExp(r'(?<=List<)[A-Za-z0-9_]+(?=>)').firstMatch(this);
+      if (match == null) {
+        return this;
+      }
+      return substring(match.start, match.end);
     }
     return this;
   }

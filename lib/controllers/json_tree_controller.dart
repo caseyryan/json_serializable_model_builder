@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:highlight/highlight_core.dart' show highlight;
 import 'package:highlight/languages/dart.dart' as dart_lang;
@@ -105,8 +106,10 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
       _error = e.toString().trim();
       rebuild();
     } catch (e) {
-      _error = 'Invalid JSON';
-      print(e);
+      _error = 'Invalid JSON: ${e.toString()}';
+      if (kDebugMode) {
+        rethrow;
+      }
     }
   }
 
@@ -158,7 +161,10 @@ class JsonTreeController extends LiteStateController<JsonTreeController> {
     } on FormatException catch (e) {
       _error = e.toString().trim();
     } catch (e) {
-      _error = 'Invalid JSON';
+      _error = e.toString();
+      if (kDebugMode) {
+        rethrow;
+      }
     }
     rebuild();
   }
