@@ -668,6 +668,9 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
   /// Balances or prices most probably must be doubles event they come as
   /// `int` in a json
   bool get _doubleMightBeUseful {
+    if (_value is! num) {
+      return false;
+    }
     if (_keyName == null || !isPrimitiveValue || !_useDerivedTypePrompts) {
       return false;
     }
@@ -686,6 +689,14 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
 
   bool get _dateTimeMightBeUseful {
     if (_keyName == null || _value is! String || !_useDerivedTypePrompts) {
+      return false;
+    }
+    try {
+      final date = DateTime.parse(_value?.toString() ?? '');
+      if (kDebugMode) {
+        print('DATE: $date');
+      }
+    } catch (e) {
       return false;
     }
     final lowerName = _keyName!.toLowerCase();
@@ -765,6 +776,8 @@ static %CLASS_MODEL_NAME%%CLASS_SUFFIX% deserialize(Map<String, dynamic> json) {
   }
 }
 
+
+
 extension ObjectExtension on Object {
   bool isPrimitiveType() {
     if (this is JsonToken) {
@@ -821,9 +834,10 @@ extension MapEntryExtension on MapEntry {
         return (value.first as Object).runtimeType.toString();
       }
     }
-    return key.toString().toSingular().firstToUpperCase();
+    return key.toString()._toCamelCase().toSingular().firstToUpperCase();
   }
 }
+
 
 extension StringExtension on String {
   String toSingular() {
@@ -831,6 +845,21 @@ extension StringExtension on String {
       return substring(0, length - 1);
     }
     return this;
+  }
+
+   String _toCamelCase([
+    bool firstToUpper = true,
+  ]) {
+    if (isEmpty) return this;
+    if (contains('_')) {
+      final result = split('_').map((e) => e._toCamelCase()).join();
+      return result;
+    }
+    final replaced = replaceAll(RegExp(r'[^A-Za-z ]+'), '');
+    if (firstToUpper) {
+      return replaced.firstToUpperCase();
+    }
+    return replaced;
   }
 
   String extractListType() {
